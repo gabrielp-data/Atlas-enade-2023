@@ -27,7 +27,7 @@
   }
 
   A.Painel = function Painel(p) {
-    const { m, agg, aggA, aggB, sel, passa, filtro, modo, duelo, brValor, escala, histDom, onSelect, token, irMetodo } = p;
+    const { m, agg, sel, passa, filtro, pedacos, brValor, escala, histDom, onSelect, token, irMetodo } = p;
     const [ordem, setOrdem] = useState("maiores");
     const [limite, setLimite] = useState(10);
     useEffect(() => setLimite(10), [sel, m, passa, ordem]);
@@ -39,14 +39,8 @@
     const comValor = useMemo(() => lista.map(i => [i, A.valorCurso(m, i)]).filter(z => z[1] != null), [lista, m]);
     const ranking = useMemo(() => comValor.slice().sort((a, b) => ordem === "maiores" ? b[1] - a[1] : a[1] - b[1]), [comValor, ordem]);
     const corBarra = val => escala.tipo === "dif" ? escala.cor(val) : A.corSeq((val - histDom[0]) / (histDom[1] - histDom[0]));
-    const pedacos = A.manchete({ m, agg, sel, filtro, modo, duelo: A.DUELOS[duelo], aggA, aggB, brValor });
-
     const reg = sel.tipo === "reg" ? sel.reg : sel.uf ? sel.uf[0] : null;
-    let olho = "Todos os cursos avaliados no ENADE 2023", titulo = "Brasil";
-    if (sel.tipo === "reg") { olho = "Região"; titulo = A.regNome(sel.reg); }
-    if (sel.tipo === "uf") { olho = `Estado · ${A.regNome(reg)}`; titulo = A.ufNome(sel.uf); }
-    if (sel.tipo === "mun") { olho = `Município · ${A.ufSigla(sel.uf)}`; titulo = A.munNome(sel.mun); }
-    if (sel.tipo === "ies") { olho = A.iesSigla(sel.ies) ? `Instituição · ${A.iesSigla(sel.ies)}` : "Instituição"; titulo = A.iesNome(sel.ies); }
+    const { titulo, olho } = A.tituloDaSelecao(sel);
 
     const tabela = useMemo(() => {
       if (sel.tipo === "br" || sel.tipo === "reg") {
@@ -61,7 +55,7 @@
     }, [agg, sel, m]);
     const tabelaOrdenada = tabela.slice().sort((a, b) => (b.v ?? -Infinity) - (a.v ?? -Infinity));
 
-    const rotuloN = m.tipo === "nota" ? "Presentes" : "Responderam";
+    const rotuloN = A.maiuscula(A.rotuloContagem(m));
     const ehIes = sel.tipo === "ies";
     const escolherArea = () => { const s = document.getElementById("area"); if (s) { s.focus(); try { s.showPicker(); } catch (e) { /* navegador sem showPicker */ } } };
 
@@ -74,7 +68,7 @@
           ${ehIes && html`<span>›</span><span>Instituição</span>`}
         </nav>`}
         <div class="linha-titulo">
-          <h1 class="titulo">${titulo}</h1>
+          <h1 class="titulo" tabindex="-1">${titulo}</h1>
           <${CopiarLink} token=${token} />
         </div>
         <div class="sub">${olho}</div>
@@ -89,7 +83,8 @@
           <i class=${"seta " + (v >= brValor ? "cima" : "baixo")} aria-hidden="true"></i>
           <b>${A.fmtDif(m, v - brValor)}</b> em relação ao Brasil (${A.fmtValor(m, brValor)})
         </div>`}
-        <p class="explica">${m.explica}</p>
+        <p class="explica">${m.explica}${m.respondentes && x && x.n > 0
+          ? ` Calculada sobre ${A.nf0.format(x.n)} respostas aos itens, dadas por ${A.nf0.format(x.pessoas)} estudantes.` : ""}</p>
       </div>
 
       ${!filtro.area && html`<div class="aviso" role="note">
@@ -106,6 +101,7 @@
 
       <section class="bloco">
         <h3>Comparações</h3>
+        <p class="explica">${filtro.area ? "Diferenças observadas dentro da área selecionada." : "Diferenças brutas entre grupos. Selecione uma área para comparar cursos da mesma área."}</p>
         <${A.Duelos} m=${m} sel=${sel} passa=${passa} dom=${histDom} />
       </section>
 
@@ -151,8 +147,8 @@
         <table>
           <thead><tr><th>${sel.tipo === "br" || sel.tipo === "reg" ? "Estado" : "Município"}</th><th>${m.curto}</th><th>Cursos</th></tr></thead>
           <tbody>
-            ${tabelaOrdenada.map(r => html`<tr key=${r.k} onClick=${() => onSelect(r.sel)}>
-              <td>${r.nome}</td><td>${A.fmtValor(m, r.v)}</td><td>${A.nf0.format(r.cursos)}</td></tr>`)}
+            ${tabelaOrdenada.map(r => html`<tr key=${r.k}>
+              <td><button type="button" onClick=${() => { onSelect(r.sel); requestAnimationFrame(() => document.querySelector(".titulo")?.focus()); }}>${r.nome}</button></td><td>${A.fmtValor(m, r.v)}</td><td>${A.nf0.format(r.cursos)}</td></tr>`)}
           </tbody>
         </table>
       </details>`}

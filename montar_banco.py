@@ -43,11 +43,11 @@ warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 # ── Configuração ────────────────────────────────────────────────────────────
 HOST, PORTA, BANCO, USUARIO, SCHEMA = "localhost", 5432, "postgres", "postgres", "gabriel"
 
-PASTA_ENADE = r"C:\Users\gabri\Downloads\Microdados_Enade_2023"
+PASTA_ENADE = os.getenv("ENADE_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "fontes", "enade"))
 PASTA_DADOS_ENADE = os.path.join(PASTA_ENADE, "DADOS")
 DIC_ENADE = os.path.join(PASTA_ENADE, "1.LEIA-ME", "Dicionário_arquivos_variáveis_microdados_Enade_2023.xlsx")
 
-PASTA_CENSO = r"C:\Users\gabri\Downloads\microdados_censo_da_educacao_superior_2023\microdados_censo_da_educacao_superior_2023"
+PASTA_CENSO = os.getenv("CENSO_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "fontes", "censo"))
 ARQ_IES = os.path.join(PASTA_CENSO, "dados", "MICRODADOS_ED_SUP_IES_2023.CSV")
 DIC_CENSO = os.path.join(PASTA_CENSO, "Anexos", "ANEXO I - Dicionário de Dados", "dicionário_dados_educação_superior.xlsx")
 

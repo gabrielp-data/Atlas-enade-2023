@@ -1,4 +1,6 @@
 // Atlas ENADE 2023 — mapa em Canvas 2D (malha do IBGE).
+// Duas camadas: "tela" desenha o mapa; "realce" desenha só o contorno do lugar sob o mouse.
+// Assim, passar o mouse não redesenha os 5.570 municípios a cada movimento.
 (function (A) {
   "use strict";
   const { useState, useEffect, useRef } = window.preactHooks;
@@ -6,20 +8,29 @@
   const reduzMovimento = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const FONTE = '"Geist", "Segoe UI", sans-serif';
 
-  const textoRotulo = (p, val) => val == null ? null : p.escala.tipo === "duelo" ? "+" + A.fmtGap(p.m, val.gap) : A.fmtValor(p.m, val);
+  // Texto do rótulo de um estado. No duelo, diz qual lado tem valor maior (a cor sozinha não basta).
+  function rotuloValor(p, val, compacto) {
+    if (val == null) return null;
+    if (p.escala.tipo === "duelo") {
+      const lado = A.DUELOS[p.duelo][val.gap >= 0 ? "a" : "b"].curto;
+      return compacto ? lado : `${lado} +${A.fmtGap(p.m, val.gap)}`;
+    }
+    if (p.escala.tipo === "dif") return A.fmtDifCurto(p.m, val - p.escala.br);
+    return A.fmtValor(p.m, val);
+  }
 
   A.Mapa = function Mapa(props) {
-    const { m, nivel, modo, duelo, sel, escala, agg, aggA, aggB, brValor, onSelect, setNivel, setModo, setDuelo, metKey, setMetKey, aba } = props;
-    const caixa = useRef(null), tela = useRef(null), topo = useRef(null);
+    const { m, nivel, modo, duelo, sel, escala, agg, brValor, rotuloArea, onSelect, setNivel, setModo, setDuelo, metKey, setMetKey, aba } = props;
+    const caixa = useRef(null), tela = useRef(null), realce = useRef(null), topo = useRef(null), caixaLegenda = useRef(null);
     const tam = useRef({ W: 0, H: 0, dpr: 1 });
     const vista = useRef(null), base = useRef(null), anim = useRef(0), agenda = useRef(0);
     const hachura = useRef(null);
     const atual = useRef({});
     const [dica, setDica] = useState(null);
-    atual.current = { m, nivel, sel, escala, dica };
+    atual.current = { m, nivel, sel, escala, dica, duelo };
 
-    // ── desenho ──
-    function desenhar() {
+    // ── camada do mapa ──
+    function desenharMapa() {
       const cv = tela.current, v = vista.current;
       if (!cv || !v) return;
       const { W, H, dpr } = tam.current;
@@ -68,36 +79,56 @@
           if (mu) ctx.stroke(mu.path);
         }
       }
-      if (p.dica) {
-        const g = p.dica.tipo === "uf" ? GEO.ufPorId.get(p.dica.id) : GEO.munPorId.get(p.dica.id);
-        if (g) { ctx.strokeStyle = "rgba(241,240,235,.9)"; ctx.lineWidth = 1.4 * px; ctx.stroke(g.path); }
-      }
       if (p.nivel === "uf") rotulos(ctx, v, dpr, W, H, p);
     }
+
+    // ── camada do realce (mouse) ──
+    function desenharRealce() {
+      const cv = realce.current, v = vista.current;
+      if (!cv || !v) return;
+      const { dpr } = tam.current;
+      const ctx = cv.getContext("2d");
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      const d = atual.current.dica;
+      if (!d) return;
+      const g = d.tipo === "uf" ? GEO.ufPorId.get(d.id) : GEO.munPorId.get(d.id);
+      if (!g) return;
+      ctx.setTransform(dpr * v.s, 0, 0, dpr * v.s, dpr * v.tx, dpr * v.ty);
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "rgba(241,240,235,.92)"; ctx.lineWidth = 1.6 / v.s;
+      ctx.stroke(g.path);
+    }
+    const desenhar = () => { desenharMapa(); desenharRealce(); };
 
     function rotulos(ctx, v, dpr, W, H, p) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       const emBrasil = p.sel.tipo === "br" && Math.abs(v.s - base.current.s) / base.current.s < 0.02;
-      const compacto = v.s < 7.5; // mapa pequeno (celular): só a sigla
+      const compacto = v.s < 7.5; // mapa pequeno (celular): rótulos mais curtos
       const caixas = [];
       ctx.textAlign = "center";
       for (const u of GEO.ufs) {
-        const c = p.escala.cores.get(u.id), txt = textoRotulo(p, p.escala.vals.get(u.id));
-        if (emBrasil && A.CAIXAS.has(u.id)) { caixas.push({ u, c, txt }); continue; }
+        const c = p.escala.cores.get(u.id), val = p.escala.vals.get(u.id);
+        if (emBrasil && A.CAIXAS.has(u.id)) { caixas.push({ u, c, txt: rotuloValor(p, val, compacto) }); continue; }
         const d = A.DESLOCA[u.id] || [0, 0];
         const x = v.s * (u.c[0] + d[0]) + v.tx, y = v.s * (u.c[1] + d[1]) + v.ty;
         if (x < -30 || x > W + 30 || y < -30 || y > H + 30) continue;
         ctx.fillStyle = c && c.L > 0.72 ? "#0d0e10" : "#f1f0eb";
         if (compacto) { ctx.font = `600 10px ${FONTE}`; ctx.fillText(A.ufSigla(u.id), x, y + 4); continue; }
+        const txt = rotuloValor(p, val, false);
         ctx.font = `600 12px ${FONTE}`;
         ctx.fillText(A.ufSigla(u.id), x, y - 1);
         if (txt) { ctx.font = `500 11px ${FONTE}`; ctx.globalAlpha = 0.85; ctx.fillText(txt, x, y + 12); ctx.globalAlpha = 1; }
       }
       if (!caixas.length) return;
       caixas.sort((a, b) => a.u.c[1] - b.u.c[1]);
-      const colX = v.s * GEO.bb[2] + v.tx + 18, bw = 64, bh = 26;
+      const colX = v.s * GEO.bb[2] + v.tx + 18, bh = 26;
       let ultimo = -Infinity;
       for (const k of caixas) {
+        const sigla = A.ufSigla(k.u.id), txt = k.txt || "—";
+        ctx.font = `600 12px ${FONTE}`; const ls = ctx.measureText(sigla).width;
+        ctx.font = `500 11px ${FONTE}`; const lt = ctx.measureText(txt).width;
+        const bw = Math.max(64, Math.ceil(8 + ls + 10 + lt + 7));
         const cy = v.s * k.u.c[1] + v.ty, cx = v.s * k.u.c[0] + v.tx;
         const ly = Math.max(cy, ultimo + bh + 6);
         ultimo = ly;
@@ -107,20 +138,22 @@
         ctx.beginPath(); ctx.roundRect(colX, ly - bh / 2, bw, bh, 5); ctx.fill();
         ctx.fillStyle = k.c && k.c.L > 0.72 ? "#0d0e10" : "#f1f0eb";
         ctx.textAlign = "left"; ctx.font = `600 12px ${FONTE}`;
-        ctx.fillText(A.ufSigla(k.u.id), colX + 8, ly + 4);
+        ctx.fillText(sigla, colX + 8, ly + 4);
         ctx.textAlign = "right"; ctx.font = `500 11px ${FONTE}`;
-        ctx.fillText(k.txt || "—", colX + bw - 7, ly + 4);
+        ctx.fillText(txt, colX + bw - 7, ly + 4);
       }
     }
 
     const pedirDesenho = () => { cancelAnimationFrame(agenda.current); agenda.current = requestAnimationFrame(desenhar); };
 
     // ── zoom ──
-    // a margem de cima acompanha a altura real dos controles (no celular eles ocupam várias linhas)
+    // as margens acompanham a altura real dos controles (em cima) e da legenda (embaixo),
+    // para nenhum estado ficar escondido atrás deles
     const margens = (W, zoom) => {
       const m0 = zoom ? A.margemZoom(W) : A.margemBrasil(W);
       const alturaControles = topo.current ? topo.current.offsetHeight + 20 : m0.t;
-      return { ...m0, t: Math.max(m0.t, alturaControles) };
+      const alturaLegenda = caixaLegenda.current ? caixaLegenda.current.offsetHeight + 20 : m0.b;
+      return { ...m0, t: Math.max(m0.t, alturaControles), b: Math.max(m0.b, alturaLegenda) };
     };
     const alvo = s => {
       const { W, H } = tam.current;
@@ -153,21 +186,26 @@
       const ro = new ResizeObserver(() => {
         const r = caixa.current.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
         tam.current = { W: r.width, H: r.height, dpr };
-        tela.current.width = Math.round(r.width * dpr); tela.current.height = Math.round(r.height * dpr);
+        for (const cv of [tela.current, realce.current]) {
+          cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+        }
         reenquadrar();
         desenhar();
       });
       ro.observe(caixa.current);
+      ro.observe(topo.current);          // controles mudam de altura (ex.: abre a escolha do duelo)
+      ro.observe(caixaLegenda.current);  // a legenda do duelo é mais alta
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(pedirDesenho);
       return () => ro.disconnect();
     }, []);
     useEffect(() => { if (base.current) irPara(alvo(sel)); }, [sel]);
     useEffect(() => { if (base.current) { reenquadrar(); pedirDesenho(); } }, [modo, aba]);
-    useEffect(() => { pedirDesenho(); }, [escala, nivel, dica, m]);
+    useEffect(() => { pedirDesenho(); }, [escala, nivel, m]);
+    useEffect(() => { desenharRealce(); }, [dica]);
 
     // ── mouse ──
     function acertar(ev) {
-      const r = tela.current.getBoundingClientRect(), v = vista.current;
+      const r = realce.current.getBoundingClientRect(), v = vista.current;
       const sx = ev.clientX - r.left, sy = ev.clientY - r.top;
       const x = (sx - v.tx) / v.s, y = (sy - v.ty) / v.s;
       const ctx = tela.current.getContext("2d");
@@ -212,36 +250,40 @@
         <div class="lugar">${nome}${!ehUf && html`<small>${A.ufSigla(dica.uf)}</small>`}</div>
         ${corpo}
         ${z && html`<div class="n">${A.nf0.format(z.cursos)} ${z.cursos === 1 ? "curso" : "cursos"} · ${A.nf0.format(z.est)} estudantes</div>`}
+        <div class="n">Clique para ver os detalhes</div>
       </div>`;
     }
 
     // ── legenda ──
     const porOnde = nivel === "uf" ? "por estado" : "por município";
+    const naArea = rotuloArea ? ` em ${rotuloArea}` : "";
     let legenda;
     if (escala.tipo === "valor") {
-      legenda = html`<div class="t">${m.rotulo} · ${porOnde}</div>
+      legenda = html`<div class="t">${m.rotulo}${naArea} · ${porOnde}</div>
         <div class="barra-cor" style=${{ background: A.gradiente(t => A.corSeq(t), 0, 1) }}></div>
         <div class="marcas"><span>${A.fmtValor(m, escala.lo)}</span><span>${A.fmtValor(m, (escala.lo + escala.hi) / 2)}</span><span>${A.fmtValor(m, escala.hi)}</span></div>`;
     } else if (escala.tipo === "dif") {
-      legenda = html`<div class="t">${m.rotulo} comparado ao Brasil · ${porOnde}</div>
+      legenda = html`<div class="t">${m.rotulo}${naArea}: diferença para o Brasil (${A.fmtValor(m, escala.br)}) · ${porOnde}</div>
         <div class="barra-cor" style=${{ background: A.gradiente(t => A.corDiv(t), -1, 1) }}></div>
-        <div class="marcas"><span>${A.fmtDif(m, -escala.D)}</span><span>Brasil</span><span>${A.fmtDif(m, escala.D)}</span></div>`;
+        <div class="marcas"><span>${A.fmtDif(m, -escala.D)}</span><span>igual</span><span>${A.fmtDif(m, escala.D)}</span></div>`;
     } else {
       const d = A.DUELOS[duelo];
       const f = escala.faixas.map(x => Number.isInteger(x) ? A.nf0.format(x) : A.fmtGap(m, x));
       const unidade = A.fmtGapUnidade(m, escala.faixas[2]).replace(/^[\d,.]+/, "");
-      legenda = html`<div class="t">${m.rotulo}: ${d.rotulo} · ${porOnde}</div>
+      legenda = html`<div class="t">${m.rotulo}${naArea}: ${d.rotulo} · ${porOnde}</div>
         <div class="faixas">
           ${["a", "b"].map(l => html`<div class="caixas" key=${l}>${[0, 1, 2, 3].map(k => html`<i key=${k} style=${{ background: A.corDuelo(l, k).css }}></i>`)}</div>
-            <span>${d[l].nome} maior</span>`)}
+            <span>${d[l].nome} maior (${d[l].curto})</span>`)}
           <div class="escala-faixas"><span>${f[0]}</span><span>${f[1]}</span><span>${f[2]}${unidade}</span></div>
         </div>`;
     }
 
     const abaAtual = A.ABAS.find(a => a.id === aba);
     return html`<div class="mapa" ref=${caixa}>
-      <canvas ref=${tela} role="img" aria-label=${`Mapa do Brasil: ${m.rotulo} ${porOnde}`}
+      <canvas ref=${tela} class="camada-mapa" aria-hidden="true"></canvas>
+      <canvas ref=${realce} role="img" aria-label=${`Mapa do Brasil: ${m.rotulo}${naArea} ${porOnde}`} aria-describedby="mapa-ajuda"
         onMouseMove=${mover} onMouseLeave=${() => setDica(null)} onClick=${clicar}></canvas>
+      <p id="mapa-ajuda" class="so-leitor">Clique num estado ou município para ver os detalhes no painel. Pelo teclado, use a tabela por estado no fim do painel.</p>
       <div class="mapa-topo" ref=${topo}>
         <div class="grupo-seg">
           ${abaAtual.metricas.length > 1 && html`<div class="seg" role="group" aria-label="Indicador">
@@ -263,11 +305,11 @@
           </div>`}
         </div>
       </div>
-      <div class="legenda">
+      <div class="legenda" ref=${caixaLegenda}>
         ${legenda}
         <div class="sem"><i class="hachura"></i>${escala.tipo === "duelo" ? `Menos de ${A.MIN_LOCAL} respostas em um dos lados` : `Menos de ${A.MIN_LOCAL} respostas`}</div>
       </div>
-      ${sel.tipo !== "br" && html`<button class="voltar" onClick=${() => onSelect({ tipo: "br" })}>Ver o Brasil todo</button>`}
+      ${sel.tipo !== "br" && html`<button class="voltar" onClick=${() => onSelect({ tipo: "br" })}>← <span class="longo">Ver o </span>Brasil<span class="longo"> todo</span></button>`}
       ${dicaHtml}
     </div>`;
   };

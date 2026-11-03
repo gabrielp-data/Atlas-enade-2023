@@ -2,7 +2,10 @@
 __pycache__/
 *.pyc
 
-# Arquivos grandes ou temporários (os microdados do INEP não vão para o repositório)
+# Microdados do INEP: ficam em fontes/ (ou em ENADE_DIR/CENSO_DIR) e não vão para o repositório
+fontes/
+
+# Arquivos grandes ou temporários
 *.dump
 *.geojson
 *.txt

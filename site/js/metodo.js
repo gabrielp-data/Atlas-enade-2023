@@ -7,8 +7,13 @@
     return html`<li><span class=${ok ? "marca-ok" : "marca-atencao"} aria-label=${ok ? "Conferido" : "Atenção"}>${ok ? "✓" : "!"}</span><div>${children}</div></li>`;
   }
 
+  const NOME_RECORTE = c => c.uf == null && c.area == null ? "Brasil"
+    : `${c.area != null ? A.NOME_AREA[c.area] : "Todas as áreas"}${c.uf != null ? " em " + A.ufSigla(String(c.uf)) : ""}`;
+
   A.Metodo = function Metodo({ voltar }) {
     const arquivosOk = AU.arquivos.every(a => a.linhas_arquivo === a.linhas_banco && a.colunas_iguais);
+    const conf = A.conferirDados();   // refeito agora, no navegador de quem abre a página
+    const confOk = conf.length > 0 && conf.every(c => c.ok);
     const presentes = AU.presenca.find(p => p[0] === 555);
     const ausentes = AU.presenca.find(p => p[0] === 222);
     const cursosFora = AU.ies_fora.reduce((s, x) => s + x[1], 0);
@@ -28,16 +33,29 @@
             <${Conferencia} ok=${AU.categorias.sem_significado === 0}><b>Todo código tem significado no dicionário oficial.</b> ${n0(AU.categorias.codigos)} códigos de ${AU.categorias.variaveis} variáveis; ${n0(AU.categorias.sem_significado)} valores sem tradução.<//>
             <${Conferencia} ok=${AU.curso_inconsistente === 0}><b>Cada curso tem os mesmos dados em todas as linhas do arq1.</b> Por isso o cadastro guarda cada um dos ${n0(AU.cursos)} cursos uma única vez.<//>
             <${Conferencia} ok=${AU.notas_fora === 0}><b>Todas as notas estão entre 0 e 100.</b><//>
+            <${Conferencia} ok=${confOk}><b>As médias do site batem com o cálculo direto no banco.</b> ${conf.length} médias (notas, renda e avaliação, no Brasil e em dois recortes) foram recalculadas agora, no seu navegador, e comparadas com o PostgreSQL. A tabela está logo abaixo.<//>
             <${Conferencia} ok=${true}><b>${AU.chaves.pk} chaves primárias e ${AU.chaves.fk} chaves estrangeiras.</b> Todas as tabelas do ENADE se ligam ao cadastro de cursos por (nu_ano, co_curso).<//>
             <${Conferencia} ok=${false}><b>${AU.ies_fora.length} instituições (${cursosFora} cursos, ${n0(estFora)} estudantes) não aparecem no Censo 2023.</b> Os cursos continuam no mapa, mas sem o nome da instituição. Por isso ${AU.chaves.fk_not_valid} ligações com o Censo estão marcadas como NOT VALID no banco.<//>
           </ul>
           <div class="rolar">
             <table>
-              <thead><tr><th>Arquivo do INEP</th><th>Tabela no banco</th><th>Linhas no arquivo</th><th>Linhas no banco</th><th>Colunas</th><th></th></tr></thead>
+              <thead><tr><th>Arquivo do INEP</th><th>Tabela no banco</th><th>Linhas no arquivo</th><th>Linhas no banco</th><th>Colunas</th><th>SHA-256</th><th></th></tr></thead>
               <tbody>${AU.arquivos.map(a => html`<tr key=${a.arquivo}>
                 <td>${a.arquivo}</td><td>${a.tabela.replace("inep_enade_2023_", "")}</td>
                 <td>${n0(a.linhas_arquivo)}</td><td>${n0(a.linhas_banco)}</td><td>${a.colunas_banco}</td>
+                <td title=${a.sha256 || ""}><code>${(a.sha256 || "—").slice(0, 12)}</code></td>
                 <td class=${a.linhas_arquivo === a.linhas_banco && a.colunas_iguais ? "ok" : ""}>${a.linhas_arquivo === a.linhas_banco && a.colunas_iguais ? "✓ bate" : "diferente"}</td></tr>`)}
+              </tbody>
+            </table>
+          </div>
+          <p class="nota-tabela">O SHA-256 é a impressão digital de cada arquivo: quem baixar os mesmos microdados do INEP pode conferir se são idênticos aos usados aqui (passe o mouse para ver o código completo).</p>
+          <div class="rolar">
+            <table>
+              <thead><tr><th>Média recalculada</th><th>Recorte</th><th>Respostas</th><th>No banco</th><th>No site</th><th></th></tr></thead>
+              <tbody>${conf.map((c, i) => html`<tr key=${i}>
+                <td>${A.METRICAS[c.metrica].rotulo}</td><td>${NOME_RECORTE(c)}</td><td>${n0(c.n)}</td>
+                <td>${A.nf2.format(c.media)}</td><td>${c.site == null ? "—" : A.nf2.format(c.site)}</td>
+                <td class=${c.ok ? "ok" : ""}>${c.ok ? "✓ bate" : "diferente"}</td></tr>`)}
               </tbody>
             </table>
           </div>
@@ -82,7 +100,8 @@
             <details><summary>O que significa NOT VALID no banco?</summary>
               <p>É uma chave estrangeira que vale para dados novos, mas não bloqueia os registros antigos que não batem. Aqui, ela marca os ${AU.ies_fora.length} códigos de instituição do ENADE que não existem no Censo 2023.</p></details>
             <details><summary>Dá para refazer tudo do zero?</summary>
-              <p>Sim. O script montar_banco.py cria e confere o banco a partir dos arquivos do INEP, e o site/scripts/exportar_dados.py gera os dados do site. Os dois estão no repositório do projeto.</p></details>
+              <p>Sim. O montar_banco.py cria e confere o banco a partir dos arquivos do INEP, o site/scripts/exportar_dados.py gera os dados do site
+              (e para se alguma média não bater com o banco) e o gerar_analise.py produz as tabelas da análise pública × privada. Os três estão no repositório do projeto.</p></details>
           </div>
         </section>
 

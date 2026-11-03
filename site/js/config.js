@@ -3,24 +3,26 @@
 (function (A) {
   "use strict";
 
-  // Link público do site (usado no botão "Copiar link" quando a página roda dentro do Claude).
-  // No GitHub Pages ou no computador, o próprio endereço da página é usado.
-  A.URL_PUBLICA = "https://claude.ai/artifact/N4EXPpZqfX9UfpY3Vugh9r";
+  // Endereço público do site (GitHub Pages). O botão "Copiar link" sempre gera um link para cá,
+  // mesmo quando o site é aberto de outro lugar; no computador (arquivo local) usa o próprio endereço.
+  A.URL_PUBLICA = "https://gabrielp-data.github.io/Atlas-enade-2023/site/";
 
   // Mínimo de respostas para mostrar um número (abaixo disso o lugar fica hachurado).
   A.MIN_UF = 30;
   A.MIN_LOCAL = 30;   // municípios, instituições e regiões pequenas
   A.MIN_CURSO = 20;   // um curso entra no ranking e no gráfico
 
-  // s = soma, n = quantidade (vêm de dados/dados.js). valor = s / n * fator
+  // s = soma, n = quantidade (vêm de dados/dados.js). valor = s / n * fator.
+  // As somas de notas chegam multiplicadas por uma escala que o próprio dados.js informa ("divisores");
+  // base.js divide por ela, então aqui o fator das notas é 1.
   A.METRICAS = {
-    ger:   { rotulo: "Nota geral", curto: "Geral", s: "s_ger", n: "n_ger", fator: 0.1, tipo: "nota",
+    ger:   { rotulo: "Nota geral", curto: "Geral", s: "s_ger", n: "n_ger", fator: 1, tipo: "nota",
              maior: "a maior nota geral",
              explica: "Média da nota geral da prova (de 0 a 100) dos estudantes presentes com resultado válido." },
-    fg:    { rotulo: "Nota em formação geral", curto: "Formação geral", s: "s_fg", n: "n_fg", fator: 0.1, tipo: "nota",
+    fg:    { rotulo: "Nota em formação geral", curto: "Formação geral", s: "s_fg", n: "n_fg", fator: 1, tipo: "nota",
              maior: "a maior nota em formação geral",
              explica: "Parte da prova comum a todos os cursos: leitura, escrita e temas gerais. De 0 a 100." },
-    ce:    { rotulo: "Nota no componente específico", curto: "Componente específico", s: "s_ce", n: "n_ce", fator: 0.1, tipo: "nota",
+    ce:    { rotulo: "Nota no componente específico", curto: "Componente específico", s: "s_ce", n: "n_ce", fator: 1, tipo: "nota",
              maior: "a maior nota no componente específico",
              explica: "Parte da prova com o conteúdo de cada área. De 0 a 100." },
     renda: { rotulo: "Renda familiar de até 3 salários mínimos", curto: "Até 3 salários", s: "n_renda3", n: "n_renda", fator: 100, tipo: "pct",
@@ -41,7 +43,7 @@
     idade: { rotulo: "Idade média", curto: "Idade", s: "s_idade", n: "n_idade", fator: 1, tipo: "anos",
              maior: "os estudantes mais velhos",
              explica: "Idade média dos estudantes no dia da prova." },
-    aval:  { rotulo: "Avaliação do curso pelos estudantes", curto: "Avaliação", s: "s_aval", n: "n_aval", fator: 1, tipo: "escala", porPessoa: 42,
+    aval:  { rotulo: "Avaliação do curso pelos estudantes", curto: "Avaliação", s: "s_aval", n: "n_aval", fator: 1, tipo: "escala", respondentes: "n_aval_pessoas",
              maior: "a melhor avaliação dos cursos pelos alunos",
              explica: "Média das 42 questões em que o estudante avalia o curso, de 1 (discordo totalmente) a 6 (concordo totalmente)." },
   };
@@ -57,11 +59,11 @@
   // Duelos: dois grupos de cursos lado a lado, como os dois candidatos de uma eleição.
   A.DUELOS = {
     rede: { id: "rede", rotulo: "Pública × Privada", campo: "rede", verbo: "tem",
-            a: { valor: 1, nome: "Pública", frase: "a rede pública", cursos: "públicos" },
-            b: { valor: 2, nome: "Privada", frase: "a rede privada", cursos: "privados" } },
+            a: { valor: 1, nome: "Pública", curto: "Púb", frase: "a rede pública", cursos: "públicos" },
+            b: { valor: 2, nome: "Privada", curto: "Priv", frase: "a rede privada", cursos: "privados" } },
     ead:  { id: "ead", rotulo: "Presencial × EaD", campo: "co_modalidade", verbo: "têm",
-            a: { valor: 1, nome: "Presencial", frase: "os cursos presenciais", cursos: "presenciais" },
-            b: { valor: 0, nome: "EaD", frase: "os cursos EaD", cursos: "a distância" } },
+            a: { valor: 1, nome: "Presencial", curto: "Pres", frase: "os cursos presenciais", cursos: "presenciais" },
+            b: { valor: 0, nome: "EaD", curto: "EaD", frase: "os cursos EaD", cursos: "a distância" } },
   };
   // Faixas de diferença do mapa de duelo (como "até 10 · 25 · 45 pontos" da referência)
   A.FAIXAS_DUELO = { nota: [2, 5, 10], pct: [5, 10, 20], anos: [1, 2, 4], escala: [0.1, 0.2, 0.4] };

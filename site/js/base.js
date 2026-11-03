@@ -13,6 +13,14 @@
   A.iesSigla = k => (D.ies[k] || [""])[0];
   A.iesNome = k => (D.ies[k] || ["", "IES " + k])[1];
   A.regNome = r => A.REGIOES[r] || r;
+  // Nome e subtítulo do lugar selecionado (painel, resumo do celular e título da aba)
+  A.tituloDaSelecao = sel => {
+    if (sel.tipo === "reg") return { titulo: A.regNome(sel.reg), olho: "Região" };
+    if (sel.tipo === "uf") return { titulo: A.ufNome(sel.uf), olho: `Estado · ${A.regNome(sel.uf[0])}` };
+    if (sel.tipo === "mun") return { titulo: A.munNome(sel.mun), olho: `Município · ${A.ufSigla(sel.uf)}` };
+    if (sel.tipo === "ies") return { titulo: A.iesNome(sel.ies), olho: A.iesSigla(sel.ies) ? `Instituição · ${A.iesSigla(sel.ies)}` : "Instituição" };
+    return { titulo: "Brasil", olho: "Todos os cursos avaliados no ENADE 2023" };
+  };
   A.ufDaSigla = {};
   for (const [k, e] of Object.entries(D.estados)) A.ufDaSigla[e.sigla.toLowerCase()] = k;
   const ACENTOS = new RegExp("[" + String.fromCharCode(0x300) + "-" + String.fromCharCode(0x36f) + "]", "g");
@@ -32,6 +40,8 @@
     const a = Math.abs(d);
     return s + numDif(m, a) + unidadeDif(m, a);
   };
+  // Diferença sem unidade, para rótulos pequenos do mapa: "+3,3" / "−1,2"
+  A.fmtDifCurto = (m, d) => (d > 0.0001 ? "+" : d < -0.0001 ? "−" : "") + numDif(m, Math.abs(d));
   // "3,3 pts acima" / "1,2 p.p. abaixo"
   A.fmtDifTexto = (m, d) => {
     const a = Math.abs(d);
@@ -41,6 +51,13 @@
   A.fmtGap = (m, g) => numDif(m, Math.abs(g));
   A.fmtGapUnidade = (m, g) => numDif(m, Math.abs(g)) + unidadeDif(m, Math.abs(g));
   A.maiuscula = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+  // O que a contagem de cada indicador representa
+  A.rotuloContagem = m => m.tipo === "nota" ? "notas válidas" : m.tipo === "anos" ? "idades registradas" : "respondentes";
+
+  // Fator final de cada indicador: o de config.js dividido pela escala em que a soma foi exportada
+  // (dados.js informa os divisores; assim config.js e a exportação nunca ficam dessincronizados)
+  const DIVISORES = D.divisores || {};
+  for (const m of Object.values(A.METRICAS)) m.fatorEfetivo = m.fator / (DIVISORES[m.s] || 1);
 
   // ───────── Cores (OKLab) ─────────
   const hexRgb = x => { const n = parseInt(x.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
@@ -97,9 +114,9 @@
   // Soma por Brasil, região, estado, município e instituição. Média = soma ÷ quantidade (nunca média de médias).
   A.agregar = (m, passa) => {
     const S = C[m.s], N = C[m.n], Q = C.qt_estudantes;
-    const novo = () => ({ s: 0, n: 0, cursos: 0, est: 0 });
+    const novo = () => ({ s: 0, n: 0, cursos: 0, cursosValidos: 0, pessoas: 0, est: 0 });
     const br = novo(), reg = new Map(), uf = new Map(), mun = new Map(), ies = new Map();
-    const soma = (x, i) => { x.s += S[i]; x.n += N[i]; x.cursos++; x.est += Q[i]; };
+    const soma = (x, i) => { x.s += S[i]; x.n += N[i]; x.pessoas += m.respondentes ? C[m.respondentes][i] : N[i]; if (N[i] > 0) x.cursosValidos++; x.cursos++; x.est += Q[i]; };
     const add = (mapa, k, i) => { let x = mapa.get(k); if (!x) mapa.set(k, x = novo()); soma(x, i); };
     for (let i = 0; i < NC; i++) {
       if (!passa(i)) continue;
@@ -112,11 +129,28 @@
     }
     return { br, reg, uf, mun, ies };
   };
-  A.pessoas = (m, x) => x ? x.n / (m.porPessoa || 1) : 0;
-  A.valorDe = (m, x, min) => x && x.n > 0 && A.pessoas(m, x) >= min ? x.s / x.n * m.fator : null;
+  A.pessoas = (m, x) => x ? x.pessoas : 0;
+  A.valorDe = (m, x, min) => x && x.n > 0 && A.pessoas(m, x) >= min ? x.s / x.n * m.fatorEfetivo : null;
   A.valorCurso = (m, i) => {
     const n = C[m.n][i];
-    return n / (m.porPessoa || 1) >= A.MIN_CURSO ? C[m.s][i] / n * m.fator : null;
+    return n > 0 && (m.respondentes ? C[m.respondentes][i] : n) >= A.MIN_CURSO ? C[m.s][i] / n * m.fatorEfetivo : null;
+  };
+
+  // Refaz no navegador as médias que o exportador calculou direto no banco (auditoria.js).
+  // Se alguma não bater, o site avisa: pega erro de escala, de fator ou de exportação.
+  A.conferirDados = () => {
+    const lista = (window.AUDITORIA && window.AUDITORIA.conferencias) || [];
+    return lista.map(c => {
+      const m = A.METRICAS[c.metrica];
+      let s = 0, n = 0;
+      for (let i = 0; i < NC; i++) {
+        if (c.uf != null && C.co_uf_curso[i] !== c.uf) continue;
+        if (c.area != null && C.co_grupo[i] !== c.area) continue;
+        s += C[m.s][i]; n += C[m.n][i];
+      }
+      const site = n ? s / n * m.fatorEfetivo : null;
+      return { ...c, site, ok: site != null && n === c.n && Math.abs(site - c.media) < 1e-6 };
+    });
   };
   A.minDaSelecao = sel => sel.tipo === "br" ? 1 : sel.tipo === "uf" || sel.tipo === "reg" ? A.MIN_UF : A.MIN_LOCAL;
   A.aggDaSelecao = (agg, sel) =>
@@ -180,8 +214,8 @@
   // Valores dos dois lados de um duelo para uma seleção
   A.valoresDuelo = (m, sel, passa, duelo) => {
     const lado = l => {
-      const x = { s: 0, n: 0, cursos: 0, est: 0 };
-      for (const i of A.cursosDa(sel, A.passaLado(passa, duelo, l))) { x.s += C[m.s][i]; x.n += C[m.n][i]; x.cursos++; x.est += C.qt_estudantes[i]; }
+      const x = { s: 0, n: 0, cursos: 0, cursosValidos: 0, pessoas: 0, est: 0 };
+      for (const i of A.cursosDa(sel, A.passaLado(passa, duelo, l))) { x.s += C[m.s][i]; x.n += C[m.n][i]; x.pessoas += m.respondentes ? C[m.respondentes][i] : C[m.n][i]; if (C[m.n][i] > 0) x.cursosValidos++; x.cursos++; x.est += C.qt_estudantes[i]; }
       return { ...x, v: A.valorDe(m, x, A.minDaSelecao(sel)) };
     };
     return { a: lado("a"), b: lado("b") };

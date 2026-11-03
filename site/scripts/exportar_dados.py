@@ -11,6 +11,8 @@ Como rodar (com o banco montado):  python site/scripts/exportar_dados.py
 """
 import datetime
 import getpass
+import hashlib
+import math
 import json
 import os
 import re
@@ -21,9 +23,10 @@ import psycopg2
 AQUI = os.path.dirname(os.path.abspath(__file__))
 PASTA_DADOS = os.path.join(os.path.dirname(AQUI), "dados")
 SCHEMA = "gabriel"
-PASTA_ENADE = r"C:\Users\gabri\Downloads\Microdados_Enade_2023\DADOS"
-CADASTRO_CURSOS_CENSO = (r"C:\Users\gabri\Downloads\microdados_censo_da_educacao_superior_2023"
-                         r"\microdados_censo_da_educacao_superior_2023\dados\MICRODADOS_CADASTRO_CURSOS_2023.CSV")
+RAIZ = os.path.dirname(os.path.dirname(AQUI))
+PASTA_ENADE = os.path.join(os.getenv("ENADE_DIR", os.path.join(RAIZ, "fontes", "enade")), "DADOS")
+CADASTRO_CURSOS_CENSO = os.path.join(os.getenv("CENSO_DIR", os.path.join(RAIZ, "fontes", "censo")),
+                                   "dados", "MICRODADOS_CADASTRO_CURSOS_2023.CSV")
 MALHA_TOPOJSON = os.path.join(PASTA_DADOS, "malha_br.topojson")
 
 ARQUIVOS = {
@@ -51,16 +54,24 @@ GRANDES_AREAS = {
 # categoria 7 (Especial) está na rede pública e a 8 (Comunitária/Confessional) na privada.
 CATEGORIAS_PUBLICAS = {1, 2, 3, 7}
 
+# As somas de notas vão multiplicadas por 100 para virar número inteiro (a nota tem 1 casa decimal).
+# Esse divisor vai junto em dados.js e o site divide por ele: assim a escala nunca fica dessincronizada.
+DIVISORES = {"s_ger": 100, "s_fg": 100, "s_ce": 100}
+
+# Recortes da conferência automática: Brasil, Medicina em MG e Enfermagem em SP
+RECORTES = [(None, None), (31, 12), (35, 23)]
+ITENS_AVALIACAO = ", ".join(f"qe_i{i}" for i in range(27, 69))
+
 SQL_CURSOS = """
 WITH
 prova AS (
     SELECT co_curso,
-           COUNT(nt_ger) FILTER (WHERE tp_pres = 555)            AS n_ger,
-           ROUND(10 * SUM(nt_ger) FILTER (WHERE tp_pres = 555))  AS s_ger,
-           COUNT(nt_fg)  FILTER (WHERE tp_pres = 555)            AS n_fg,
-           ROUND(10 * SUM(nt_fg)  FILTER (WHERE tp_pres = 555))  AS s_fg,
-           COUNT(nt_ce)  FILTER (WHERE tp_pres = 555)            AS n_ce,
-           ROUND(10 * SUM(nt_ce)  FILTER (WHERE tp_pres = 555))  AS s_ce
+           COUNT(nt_ger) FILTER (WHERE tp_pres = 555)             AS n_ger,
+           ROUND(100 * SUM(nt_ger) FILTER (WHERE tp_pres = 555))  AS s_ger,
+           COUNT(nt_fg)  FILTER (WHERE tp_pres = 555)             AS n_fg,
+           ROUND(100 * SUM(nt_fg)  FILTER (WHERE tp_pres = 555))  AS s_fg,
+           COUNT(nt_ce)  FILTER (WHERE tp_pres = 555)             AS n_ce,
+           ROUND(100 * SUM(nt_ce)  FILTER (WHERE tp_pres = 555))  AS s_ce
     FROM inep_enade_2023_aluno_resultado_prova GROUP BY co_curso),
 sexo AS (
     SELECT co_curso, COUNT(*) FILTER (WHERE tp_sexo = 'F') AS n_fem,
@@ -82,21 +93,21 @@ renda AS (
     SELECT co_curso, COUNT(*) FILTER (WHERE qe_i08 IN ('A', 'B')) AS n_renda3, COUNT(qe_i08) AS n_renda
     FROM inep_enade_2023_aluno_renda_familiar GROUP BY co_curso),
 aval AS (
-    SELECT a.co_curso, SUM(u.v) AS s_aval, COUNT(u.v) AS n_aval
+    SELECT a.co_curso, SUM(u.v) AS s_aval, SUM(u.n_itens) AS n_aval, COUNT(*) AS n_aval_pessoas
     FROM inep_enade_2023_aluno_avaliacao_curso a
-    CROSS JOIN LATERAL unnest(ARRAY[
+    CROSS JOIN LATERAL (SELECT SUM(v) AS v, COUNT(*) AS n_itens FROM unnest(ARRAY[
         qe_i27, qe_i28, qe_i29, qe_i30, qe_i31, qe_i32, qe_i33, qe_i34, qe_i35, qe_i36, qe_i37, qe_i38,
         qe_i39, qe_i40, qe_i41, qe_i42, qe_i43, qe_i44, qe_i45, qe_i46, qe_i47, qe_i48, qe_i49, qe_i50,
         qe_i51, qe_i52, qe_i53, qe_i54, qe_i55, qe_i56, qe_i57, qe_i58, qe_i59, qe_i60, qe_i61, qe_i62,
-        qe_i63, qe_i64, qe_i65, qe_i66, qe_i67, qe_i68]) AS u(v)
-    WHERE u.v BETWEEN 1 AND 6          -- 7 = não sei e 8 = não se aplica ficam de fora
+        qe_i63, qe_i64, qe_i65, qe_i66, qe_i67, qe_i68]) AS item(v) WHERE v BETWEEN 1 AND 6) u
+    WHERE u.n_itens > 0          -- 7 = não sei e 8 = não se aplica ficam de fora
     GROUP BY a.co_curso)
 SELECT c.co_curso, c.co_ies, c.co_munic_curso, c.co_uf_curso, c.co_grupo, c.co_modalidade, c.co_categad,
        c.qt_estudantes,
        prova.n_ger, prova.s_ger, prova.n_fg, prova.s_fg, prova.n_ce, prova.s_ce,
        sexo.n_fem, sexo.n_sexo, idade.s_idade, idade.n_idade, cor.n_ppi, cor.n_cor,
        pai.n_pai_sup, pai.n_pai, mae.n_mae_sup, mae.n_mae, renda.n_renda3, renda.n_renda,
-       aval.s_aval, aval.n_aval
+       aval.s_aval, aval.n_aval, aval.n_aval_pessoas
 FROM inep_enade_2023_cadastro_curso c
 LEFT JOIN prova USING (co_curso) LEFT JOIN sexo USING (co_curso) LEFT JOIN idade USING (co_curso)
 LEFT JOIN cor USING (co_curso)   LEFT JOIN pai USING (co_curso)  LEFT JOIN mae USING (co_curso)
@@ -145,6 +156,9 @@ def escrever_js(nome, variavel, conteudo):
 def montar_auditoria(cur, cursos):
     print("Conferindo os dados para a página de auditoria...")
     arquivos = []
+    def sha256(caminho):
+        with open(caminho, "rb") as arquivo:
+            return hashlib.file_digest(arquivo, "sha256").hexdigest()
     for n, tabela in ARQUIVOS.items():
         caminho = os.path.join(PASTA_ENADE, f"microdados2023_arq{n}.txt")
         with open(caminho, encoding="latin1") as f:
@@ -153,7 +167,7 @@ def montar_auditoria(cur, cursos):
         linhas_banco = cur.fetchone()[0]
         cols_banco = [c for c in colunas(cur, tabela) if c != "id_registro"]
         arquivos.append({"arquivo": f"microdados2023_arq{n}.txt", "tabela": tabela,
-                         "linhas_arquivo": contar_linhas(caminho), "linhas_banco": linhas_banco,
+                         "sha256": sha256(caminho), "linhas_arquivo": contar_linhas(caminho), "linhas_banco": linhas_banco,
                          "colunas_arquivo": len(cab), "colunas_banco": len(cols_banco),
                          "colunas_iguais": sorted(cab) == sorted(cols_banco)})
 
@@ -205,6 +219,7 @@ def montar_auditoria(cur, cursos):
     return {
         "gerado_em": datetime.datetime.now().strftime("%d/%m/%Y"),
         "arquivos": arquivos,
+        "fontes_auxiliares": {os.path.basename(p): sha256(p) for p in (CADASTRO_CURSOS_CENSO, MALHA_TOPOJSON)},
         "estudantes": sum(cursos["qt_estudantes"]),
         "cursos": total,
         "categorias": {"variaveis": variaveis, "codigos": codigos, "sem_significado": sem_significado},
@@ -217,6 +232,43 @@ def montar_auditoria(cur, cursos):
         "rede": {"publica": [len(pub), soma(pub)], "privada": [total - len(pub), sum(cursos["qt_estudantes"]) - soma(pub)]},
         "modalidade": {"ead": [len(ead), soma(ead)], "presencial": [total - len(ead), sum(cursos["qt_estudantes"]) - soma(ead)]},
     }
+
+
+def conferir_exportacao(cur, cursos):
+    """Recalcula médias direto nas tabelas de estudantes e compara com as somas exportadas.
+    O resultado vai para auditoria.js; o site refaz a conta no navegador e avisa se não bater."""
+    filtro = "(%(uf)s::int IS NULL OR c.co_uf_curso = %(uf)s) AND (%(area)s::int IS NULL OR c.co_grupo = %(area)s)"
+    juntar = "JOIN inep_enade_2023_cadastro_curso c USING (nu_ano, co_curso)"
+    consultas = {
+        "ger": f"SELECT COUNT(p.nt_ger), AVG(p.nt_ger) FROM inep_enade_2023_aluno_resultado_prova p {juntar} WHERE p.tp_pres = 555 AND {filtro}",
+        "fg": f"SELECT COUNT(p.nt_fg), AVG(p.nt_fg) FROM inep_enade_2023_aluno_resultado_prova p {juntar} WHERE p.tp_pres = 555 AND {filtro}",
+        "ce": f"SELECT COUNT(p.nt_ce), AVG(p.nt_ce) FROM inep_enade_2023_aluno_resultado_prova p {juntar} WHERE p.tp_pres = 555 AND {filtro}",
+        "renda": f"""SELECT COUNT(r.qe_i08), 100.0 * COUNT(*) FILTER (WHERE r.qe_i08 IN ('A', 'B')) / NULLIF(COUNT(r.qe_i08), 0)
+                     FROM inep_enade_2023_aluno_renda_familiar r {juntar} WHERE {filtro}""",
+        "aval": f"""SELECT COUNT(u.v), AVG(u.v) FROM inep_enade_2023_aluno_avaliacao_curso a {juntar}
+                    CROSS JOIN LATERAL unnest(ARRAY[{ITENS_AVALIACAO}]) AS u(v)
+                    WHERE u.v BETWEEN 1 AND 6 AND {filtro}""",
+    }
+    # (soma, quantidade, fator) como o site usa
+    somas = {"ger": ("s_ger", "n_ger", 1 / DIVISORES["s_ger"]), "fg": ("s_fg", "n_fg", 1 / DIVISORES["s_fg"]),
+             "ce": ("s_ce", "n_ce", 1 / DIVISORES["s_ce"]), "renda": ("n_renda3", "n_renda", 100), "aval": ("s_aval", "n_aval", 1)}
+    resultado = []
+    for metrica, sql in consultas.items():
+        recortes = RECORTES if metrica != "aval" else RECORTES[:1]  # avaliação: só Brasil (consulta pesada)
+        for uf, area in recortes:
+            cur.execute(sql, {"uf": uf, "area": area})
+            n_sql, media_sql = cur.fetchone()
+            s_col, n_col, fator = somas[metrica]
+            idx = [i for i, (u, a) in enumerate(zip(cursos["co_uf_curso"], cursos["co_grupo"]))
+                   if (uf is None or u == uf) and (area is None or a == area)]
+            n_site = sum(cursos[n_col][i] for i in idx)
+            media_site = sum(cursos[s_col][i] for i in idx) / n_site * fator if n_site else None
+            if n_site != n_sql or not math.isclose(media_site, float(media_sql), rel_tol=1e-12, abs_tol=1e-9):
+                raise ValueError(f"Exportação divergente: {metrica}, UF {uf}, área {area} "
+                                 f"(banco {n_sql} / {media_sql}, site {n_site} / {media_site})")
+            resultado.append({"metrica": metrica, "uf": uf, "area": area, "n": n_sql, "media": float(media_sql)})
+    print(f"Conferência: {len(resultado)} médias do site batem com o cálculo direto no banco.")
+    return resultado
 
 
 def main():
@@ -245,7 +297,9 @@ def main():
     for c in set(cursos["co_ies"]) - set(ies):
         ies[c] = ["", f"IES {c} (fora do Censo 2023)"]
 
+    conferencias = conferir_exportacao(cur, cursos)
     auditoria = montar_auditoria(cur, cursos)
+    auditoria["conferencias"] = conferencias
     conn.close()
 
     print("Lendo nomes de municípios e estados (Censo 2023)...")
@@ -269,20 +323,26 @@ def main():
     grupos = [{"nome": g, "areas": [[c, areas[c]] for c in sorted(cods, key=lambda c: areas[c])]}
               for g, cods in GRANDES_AREAS.items()]
 
+    problemas = [a["arquivo"] for a in auditoria["arquivos"]
+                 if a["linhas_arquivo"] != a["linhas_banco"] or not a["colunas_iguais"]]
+    if problemas:
+        raise ValueError(f"Arquivos divergentes do banco: {problemas}")
+    with open(MALHA_TOPOJSON, encoding="utf-8") as f:
+        malha = json.load(f)
+    if malha.get("type") != "Topology":
+        raise ValueError("A malha do IBGE precisa estar em TopoJSON.")
     os.makedirs(PASTA_DADOS, exist_ok=True)
     escrever_js("dados.js", "ENADE", {
         "fonte": "INEP: Microdados ENADE 2023 e Censo da Educação Superior 2023",
+        "divisores": DIVISORES,
         "cursos": cursos, "ies": ies, "municipios": municipios, "estados": estados,
         "grupos": grupos, "categorias": categorias,
     })
     escrever_js("auditoria.js", "AUDITORIA", auditoria)
-    with open(MALHA_TOPOJSON, encoding="utf-8") as f:
-        escrever_js("malha.js", "MALHA", f.read().strip())
+    escrever_js("malha.js", "MALHA", malha)
 
     print(f"Pronto: {len(linhas):,} cursos, {len(ies):,} IES, {len(municipios):,} municípios.")
-    problemas = [a["arquivo"] for a in auditoria["arquivos"]
-                 if a["linhas_arquivo"] != a["linhas_banco"] or not a["colunas_iguais"]]
-    print("Auditoria:", "tudo bate com os arquivos do INEP" if not problemas else f"DIFERENÇAS em {problemas}")
+    print("Auditoria: contagens e colunas conferidas com as fontes.")
 
 
 if __name__ == "__main__":

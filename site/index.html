@@ -1,14 +1,23 @@
 <!doctype html>
+<html lang="pt-BR">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Atlas ENADE 2023</title>
-<meta name="description" content="Mapa interativo dos cursos do ENADE 2023 por estado e município: nota, renda, escolaridade dos pais, perfil e avaliação do curso.">
+<meta name="description" content="Mapa interativo dos cursos do ENADE 2023 por região, estado e município: nota, renda, escolaridade dos pais, perfil, avaliação do curso e comparação entre as redes pública e privada.">
+<meta name="theme-color" content="#0d0e10">
+<!-- prévia do link no WhatsApp, Teams e redes sociais -->
+<meta property="og:type" content="website">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:title" content="Atlas ENADE 2023">
+<meta property="og:description" content="Mapa interativo dos cursos do ENADE 2023: nota, renda e perfil por estado e município, com a comparação entre as redes pública e privada.">
+<meta property="og:url" content="https://gabrielp-data.github.io/Atlas-enade-2023/site/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230d0e10'/%3E%3Cpath d='M9 24 16 8l7 16' fill='none' stroke='%236da7ec' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M12 19h8' stroke='%23f1f0eb' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Faustina:wght@500;600;700&family=Geist:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="css/estilo.css">
 
-<div id="app"></div>
+<div id="app"><div class="carregando"><div><b>Atlas ENADE 2023</b>Carregando o mapa…</div></div></div>
 
 <!-- Bibliotecas (versões fixas) -->
 <script src="https://cdn.jsdelivr.net/npm/preact@10.24.3/dist/preact.umd.js"></script>
@@ -30,3 +39,12 @@
 <script src="js/mapa.js"></script>
 <script src="js/metodo.js"></script>
 <script src="js/app.js"></script>
+
+<!-- Se uma biblioteca ou um arquivo de dados não carregou, mostra um aviso em vez de uma tela vazia -->
+<script>
+  if (!(window.Atlas && window.Atlas.montado)) {
+    var aviso = document.querySelector("#app .carregando");
+    if (aviso) aviso.innerHTML = "<div><b>Não foi possível abrir o mapa</b>Verifique a conexão com a internet e recarregue a página. "
+      + "Se estiver abrindo pelo computador, confira se as pastas dados/, js/ e css/ estão junto do index.html.</div>";
+  }
+</script>

@@ -70,7 +70,8 @@
     const s = Math.min(w / (bb[2] - bb[0]), h / (bb[3] - bb[1]));
     return { s, tx: m.l + w / 2 - s * (bb[0] + bb[2]) / 2, ty: m.t + h / 2 - s * (bb[1] + bb[3]) / 2 };
   };
-  A.margemBrasil = W => W > 560 ? { t: 64, r: 108, b: 24, l: 24 } : { t: 100, r: 84, b: 96, l: 8 };
+  // à direita fica o espaço das caixas de RN, PB, PE, AL, SE, ES e RJ (no duelo elas têm texto maior)
+  A.margemBrasil = W => W > 560 ? { t: 64, r: 124, b: 24, l: 24 } : { t: 100, r: 84, b: 96, l: 8 };
   A.margemZoom = W => W > 560 ? { t: 64, r: 36, b: 40, l: 36 } : { t: 100, r: 16, b: 96, l: 16 };
 
   A.criarHachura = () => {

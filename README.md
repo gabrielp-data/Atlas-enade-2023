@@ -2,6 +2,8 @@
 
 Trabalho de Conclusão de Curso: banco de dados dos **Microdados do ENADE 2023** (INEP) em PostgreSQL e um **site com mapa interativo** que mostra, por região, estado e município, a nota, a renda e o perfil dos cursos avaliados.
 
+**Site:** https://gabrielp-data.github.io/Atlas-enade-2023/ · **Análise:** [ANALISE_ENADE_2023.md](ANALISE_ENADE_2023.md)
+
 - 406.294 estudantes, 9.812 cursos e 1.347 instituições
 - Banco conferido com os arquivos originais do INEP: mesmas linhas, mesmas colunas, todos os códigos com significado
 - Dicionário de dados em Excel e dentro do próprio banco (aparece no DBeaver)
@@ -11,6 +13,7 @@ Trabalho de Conclusão de Curso: banco de dados dos **Microdados do ENADE 2023**
 | Pasta / arquivo | O que é |
 |---|---|
 | `montar_banco.py` | Monta o banco inteiro do zero com um comando |
+| `gerar_analise.py` | Gera `ANALISE_ENADE_2023.md` (pública × privada por área e região) direto do banco |
 | `sql/` | Scripts SQL, numerados na ordem em que rodam |
 | `dicionario/` | Dicionário de dados em Excel (`.xlsx`) e HTML |
 | `site/` | O site (mapa interativo) |
@@ -19,7 +22,16 @@ Trabalho de Conclusão de Curso: banco de dados dos **Microdados do ENADE 2023**
 
 ## Como montar o banco
 
-Precisa de PostgreSQL, Python 3 e dos microdados baixados do portal de dados abertos do INEP (ENADE 2023 e Censo da Educação Superior 2023). Os caminhos das pastas ficam no início de `montar_banco.py`.
+Precisa de PostgreSQL, Python 3 e dos microdados baixados do portal de dados abertos do INEP (ENADE 2023 e Censo da Educação Superior 2023). Os scripts procuram os microdados em `fontes/enade` e `fontes/censo`, na raiz do projeto. A pasta `fontes/` fica fora do Git, então os microdados nunca vão para o repositório. Há duas formas de apontar para eles:
+
+- **Atalho (recomendado no Windows):** cria `fontes/` como atalho para onde os arquivos já estão, sem copiar nada:
+
+  ```powershell
+  New-Item -ItemType Junction -Path fontes\enade -Target "C:\caminho\Microdados_Enade_2023"
+  New-Item -ItemType Junction -Path fontes\censo -Target "C:\caminho\microdados_censo_da_educacao_superior_2023"
+  ```
+
+- **Variáveis de ambiente:** `ENADE_DIR` e `CENSO_DIR` com o caminho das pastas extraídas.
 
 ```bash
 pip install pandas psycopg2 openpyxl
@@ -45,6 +57,10 @@ python site/scripts/exportar_dados.py
 ```
 
 Ele gera `site/dados/dados.js` (números por curso), `site/dados/auditoria.js` (conferências) e `site/dados/malha.js` (mapa). Depois é só abrir `site/index.html` no navegador.
+
+**Conferência automática.** O exportador recalcula 13 médias direto no banco (as três notas, renda e avaliação, no Brasil e em dois recortes) e só grava os arquivos se elas baterem com o que foi exportado. O site refaz as mesmas contas no navegador: se alguma não bater, ele mostra um aviso vermelho no topo e marca o erro na página "Como os dados foram tratados".
+
+**Análise da pergunta de pesquisa.** `python gerar_analise.py` lê o banco e reescreve `ANALISE_ENADE_2023.md`. Rode de novo sempre que o banco mudar, para o texto do TCC usar números atuais.
 
 O site usa Preact com htm, sem etapa de build. O mapa é desenhado em Canvas 2D a partir da malha oficial dos municípios do IBGE, simplificada com mapshaper e salva em TopoJSON. A tipografia é Faustina e Geist.
 
@@ -91,3 +107,7 @@ Todos os arquivos do INEP têm `NU_ANO` e `CO_CURSO`, mas nenhum código de estu
 - **Censo da Educação Superior 2023 (INEP):** cadastro de IES e de cursos.
 - **Dicionários oficiais do ENADE e do Censo:** fonte das descrições e categorias.
 - **Malha de municípios do IBGE:** base do mapa.
+
+## Pergunta de pesquisa
+
+Como a diferença de desempenho entre as redes pública e privada varia por área e região no ENADE 2023? A comparação usa médias ponderadas pela quantidade de notas válidas. As diferenças são descritivas. Renda e perfil contextualizam os cursos e não permitem inferências individuais.

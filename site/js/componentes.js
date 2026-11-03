@@ -43,7 +43,7 @@
         aria-label="Buscar faculdade ou cidade"
         onInput=${e => { setQ(e.target.value); setAberto(true); setAtivo(0); }}
         onFocus=${() => setAberto(true)} onBlur=${() => setTimeout(() => setAberto(false), 150)} onKeyDown=${tecla} />
-      ${aberto && q.trim().length >= 2 && html`<ul class="resultados" role="listbox">
+      ${aberto && q.trim().length >= 2 && html`<ul class="resultados">
         ${res.length ? res.map((r, i) => html`<li key=${r.tipo + r.id}>
           <button class=${i === ativo ? "ativo" : ""} onMouseDown=${e => e.preventDefault()} onClick=${() => escolher(r)}>
             <span>${r.titulo}</span><small>${r.detalhe}</small>
@@ -114,8 +114,8 @@
             ${a.v != null && html`<circle cx=${X(a.v)} cy="11" r="6" fill=${A.CORES_DUELO.a} stroke="#141619" stroke-width="2"/>`}
           </svg>
           <div class="rodape">
-            ${ambos ? `Diferença de ${A.fmtGapUnidade(m, a.v - b.v)} a favor de ${a.v >= b.v ? d.a.nome : d.b.nome}` : "Poucas respostas de um dos lados para comparar"}
-            · ${A.nf0.format(a.cursos)} cursos ${d.a.cursos} e ${A.nf0.format(b.cursos)} ${d.b.cursos}
+            ${ambos ? `Diferença observada de ${A.fmtGapUnidade(m, a.v - b.v)} a favor de ${a.v >= b.v ? d.a.nome : d.b.nome}` : "Poucas respostas de um dos lados para comparar"}
+            <br />${[ [d.a.nome, a], [d.b.nome, b] ].map(([nome, lado]) => html`<div>${nome} · ${A.nf0.format(lado.cursosValidos)} cursos com dados · ${A.nf0.format(lado.pessoas)} ${A.rotuloContagem(m)}</div>`)}
           </div>
         </div>`;
       })}

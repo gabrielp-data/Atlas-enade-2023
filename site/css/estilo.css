@@ -10,7 +10,7 @@
   --linha: #272a30;
   --tinta: #f1f0eb;
   --tinta-2: #a9adb4;
-  --tinta-3: #747981;
+  --tinta-3: #8b9098;   /* 5,7:1 sobre o painel (mínimo para texto pequeno: 4,5:1) */
   --foco: #6da7ec;
   --lado-a: #3987e5;
   --lado-b: #d95926;
@@ -22,6 +22,14 @@ body { margin: 0; background: var(--chao); color: var(--tinta); font: 14px/1.45 
 #app { height: 100%; }
 button, input, select { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+/* texto só para leitores de tela */
+.so-leitor { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* enquanto os dados carregam, ou se algo falhar */
+.carregando { min-height: 100%; display: grid; place-items: center; padding: 24px; box-sizing: border-box; text-align: center; color: var(--tinta-2); font-size: 15px; }
+.carregando b { display: block; font-family: var(--serif); font-size: 26px; color: var(--tinta); margin-bottom: 6px; }
+.alerta-dados { margin: 10px 0 0; background: #3a1d1b; border: 1px solid #7a3530; color: #f3d2ce; border-radius: 8px; padding: 10px 14px; font-size: 13px; }
+.alerta-dados b { color: #fff; }
 
 .app { height: 100%; box-sizing: border-box; padding-inline: 16px; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto 1fr; }
 .app.so-topo { grid-template-rows: auto 1fr; }
@@ -30,7 +38,9 @@ button, input, select { font: inherit; color: inherit; }
 .topo { display: flex; align-items: center; gap: 24px; min-height: 60px; border-bottom: 1px solid var(--linha); }
 .marca { font-family: var(--serif); font-weight: 600; font-size: 23px; letter-spacing: -0.01em; white-space: nowrap; line-height: 1; background: none; border: 0; padding: 0; cursor: pointer; }
 .marca span { font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--tinta-3); letter-spacing: 0.06em; margin-left: 8px; vertical-align: 3px; }
-.abas { display: flex; gap: 2px; flex: 1; overflow-x: auto; scrollbar-width: none; align-self: stretch; }
+/* a borda direita esmaece quando há mais abas escondidas (só aparece se o conteúdo chega até ela) */
+.abas { display: flex; gap: 2px; flex: 1; overflow-x: auto; scrollbar-width: none; align-self: stretch;
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); }
 .abas::-webkit-scrollbar { display: none; }
 .aba { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--tinta-2); font-weight: 500; padding: 0 12px; cursor: pointer; white-space: nowrap; }
 .aba:hover { color: var(--tinta); }
@@ -38,6 +48,8 @@ button, input, select { font: inherit; color: inherit; }
 .espaco { flex: 1; }
 .link-metodo { background: none; border: 1px solid var(--linha); border-radius: 8px; padding: 7px 12px; color: var(--tinta-2); cursor: pointer; white-space: nowrap; font-size: 13px; }
 .link-metodo:hover { color: var(--tinta); border-color: #3a3f47; }
+.link-metodo .curto { display: none; }
+@media (max-width: 1280px) { .link-metodo .longo { display: none; } .link-metodo .curto { display: inline; } }
 
 .busca { position: relative; width: 280px; max-width: 100%; }
 .busca input { width: 100%; box-sizing: border-box; background: var(--elev); border: 1px solid var(--linha); border-radius: 8px; padding: 8px 12px 8px 34px; }
@@ -50,7 +62,8 @@ button, input, select { font: inherit; color: inherit; }
 .resultados .vazio { padding: 8px 10px; color: var(--tinta-3); }
 
 /* ---------- filtros ---------- */
-.filtros { display: flex; align-items: center; gap: 8px; padding-block: 12px; overflow-x: auto; scrollbar-width: none; }
+.filtros { display: flex; align-items: center; gap: 8px; padding-block: 12px; overflow-x: auto; scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); }
 .filtros::-webkit-scrollbar { display: none; }
 .rotulo { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--tinta-3); white-space: nowrap; margin-right: 4px; }
 .chip { background: var(--elev); border: 1px solid var(--linha); color: var(--tinta-2); border-radius: 999px; padding: 5px 12px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
@@ -65,6 +78,10 @@ button, input, select { font: inherit; color: inherit; }
 .mapa { position: relative; min-height: 0; border-radius: 12px; overflow: hidden; background: var(--chao); }
 /* absoluto: o tamanho do canvas não pode empurrar a coluna (ele tem largura própria em pixels) */
 .mapa canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; cursor: pointer; touch-action: manipulation; }
+.mapa canvas.camada-mapa { pointer-events: none; }   /* o mouse é lido na camada de cima (realce) */
+
+/* resumo acima do mapa: só no celular, onde o painel fica lá embaixo */
+.resumo-movel { display: none; }
 
 /* ---------- painel ---------- */
 .cabeca { display: grid; gap: 6px; }
@@ -148,8 +165,9 @@ details.tabela summary { cursor: pointer; font-size: 11px; font-weight: 600; let
 .tabela td, .tabela th, .metodo td, .metodo th { padding: 6px 4px; border-bottom: 1px solid var(--linha); text-align: right; font-size: 13px; }
 .tabela th, .metodo th { font-size: 11px; color: var(--tinta-3); font-weight: 600; }
 .tabela td:first-child, .tabela th:first-child, .metodo td:first-child, .metodo th:first-child { text-align: left; }
-.tabela tbody tr { cursor: pointer; }
 .tabela tbody tr:hover { background: rgba(255,255,255,.03); }
+.tabela td button { background: none; border: 0; padding: 0; margin: 0; color: inherit; text-align: left; cursor: pointer; }
+.tabela td button:hover { color: var(--foco); text-decoration: underline; }
 
 .fonte { font-size: 12px; color: var(--tinta-3); margin: auto 0 0; padding-top: 14px; border-top: 1px solid var(--linha); }
 .fonte button { background: none; border: 0; padding: 0; color: var(--foco); cursor: pointer; font-size: 12px; }
@@ -175,7 +193,7 @@ details.tabela summary { cursor: pointer; font-size: 11px; font-weight: 600; let
 .legenda .escala-faixas { grid-column: 1; display: flex; justify-content: space-between; color: var(--tinta-3); font-variant-numeric: tabular-nums; width: 94px; box-sizing: border-box; padding-inline: 12px 0; white-space: nowrap; }
 .hachura { width: 14px; height: 10px; border-radius: 2px; background: repeating-linear-gradient(135deg, #2b2f35 0 1.5px, #111316 1.5px 5px); }
 
-.voltar { position: absolute; right: 12px; bottom: 12px; background: var(--elev); border: 1px solid var(--linha); border-radius: 8px; padding: 7px 12px; cursor: pointer; font-size: 13px; }
+.voltar { position: absolute; right: 12px; bottom: 12px; background: var(--elev); border: 1px solid var(--linha); border-radius: 8px; padding: 7px 12px; cursor: pointer; font-size: 13px; white-space: nowrap; }
 .voltar:hover { background: var(--elev-2); }
 
 .dica { position: absolute; z-index: 10; pointer-events: none; background: var(--elev); border: 1px solid #343840; border-radius: 10px; padding: 10px 12px; min-width: 190px; max-width: 260px; box-shadow: 0 10px 30px rgba(0,0,0,.55); }
@@ -224,8 +242,17 @@ details.tabela summary { cursor: pointer; font-size: 11px; font-weight: 600; let
   .painel { overflow: visible; }
   .titulo { font-size: 26px; }
   .numero { font-size: 44px; }
-  .legenda { width: 230px; font-size: 11px; padding: 8px 10px; }
+  .legenda { width: 200px; font-size: 11px; padding: 8px 10px; }
+  .legenda .t { margin-bottom: 6px; }
+  .voltar .longo { display: none; }   /* "← Brasil": cabe ao lado da legenda */
+  .resumo-movel { display: grid; gap: 4px; padding-block: 2px 12px; }
+  .resumo-movel .lugar { font-family: var(--serif); font-weight: 600; font-size: 22px; line-height: 1.15; }
+  .resumo-movel .lugar small { font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--tinta-3); margin-left: 6px; }
+  .resumo-movel .manchete { font-size: 16px; margin: 0; }
+  .painel .cabeca .manchete { display: none; }   /* no celular ela já aparece acima do mapa */
   .metodo { overflow: visible; }
   .metodo h1 { font-size: 30px; }
 }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+.metodo .nota-tabela { font-size: 12px; color: var(--tinta-3); margin-top: 6px; }
+.metodo code { font: 12px Consolas, monospace; color: var(--tinta-2); }

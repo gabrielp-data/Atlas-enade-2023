@@ -80,6 +80,21 @@
     useEffect(() => {
       try { history.replaceState(null, "", "#" + token); } catch (e) { /* alguns visualizadores bloqueiam */ }
     }, [token]);
+
+    const rotuloArea = filtro.area ? A.NOME_AREA[filtro.area] : filtro.grupo >= 0 ? D.grupos[filtro.grupo].nome.toLowerCase() : null;
+    const { titulo } = A.tituloDaSelecao(sel);
+    const pedacos = A.manchete({ m, agg, sel, filtro, modo, duelo: A.DUELOS[duelo], aggA, aggB, brValor });
+    useEffect(() => {
+      document.title = view === "metodo" ? "Como os dados foram tratados · Atlas ENADE 2023"
+        : `${titulo} · ${m.rotulo}${rotuloArea ? " em " + rotuloArea : ""} · Atlas ENADE 2023`;
+    }, [view, titulo, m, rotuloArea]);
+
+    // Conferência no navegador: as médias do site precisam bater com as calculadas no banco
+    const falhas = useMemo(() => {
+      const f = A.conferirDados().filter(c => !c.ok);
+      if (f.length) console.error("Atlas ENADE: médias do site diferentes das do banco", f);
+      return f;
+    }, []);
     useEffect(() => {
       const aoMudar = () => {
         const st = lerHash();
@@ -103,9 +118,12 @@
         </nav>` : html`<span class="espaco"></span>`}
         <${A.Busca} onSelect=${selecionar} />
         <button class="link-metodo" onClick=${() => setView(view === "mapa" ? "metodo" : "mapa")}>
-          ${view === "mapa" ? "Como os dados foram tratados" : "Voltar ao mapa"}
+          ${view === "mapa" ? html`<span class="longo">Como os dados foram tratados</span><span class="curto">Método</span>` : "Voltar ao mapa"}
         </button>
       </header>
+
+      ${falhas.length > 0 && html`<p class="alerta-dados" role="alert"><b>Atenção:</b> ${falhas.length} ${falhas.length === 1 ? "média do site não bate" : "médias do site não batem"} com o cálculo direto no banco.
+        Rode <code>site/scripts/exportar_dados.py</code> de novo antes de usar estes números.</p>`}
 
       ${view === "mapa" && html`<div class="filtros" role="group" aria-label="Área do curso">
         <span class="rotulo">Área do curso</span>
@@ -119,15 +137,23 @@
         </select>
       </div>`}
 
+      ${view === "mapa" && html`<div class="resumo-movel" aria-hidden="true">
+        <div class="lugar">${titulo}<small>${m.rotulo}${rotuloArea ? " em " + rotuloArea : ""}</small></div>
+        <p class="manchete">${pedacos.map((p, i) => typeof p === "string" ? p : html`<b key=${i}>${p.f}</b>`)}</p>
+      </div>`}
+
       ${view === "mapa" ? html`<main class="corpo">
-        <${A.Painel} m=${m} agg=${agg} aggA=${aggA} aggB=${aggB} sel=${sel} passa=${passa} filtro=${filtro} modo=${modo} duelo=${duelo}
+        <${A.Painel} m=${m} agg=${agg} sel=${sel} passa=${passa} filtro=${filtro} pedacos=${pedacos}
           brValor=${brValor} escala=${escala} histDom=${histDom} onSelect=${selecionar} token=${token} irMetodo=${() => setView("metodo")} />
-        <${A.Mapa} m=${m} nivel=${nivel} modo=${modo} duelo=${duelo} sel=${sel} escala=${escala} agg=${agg} aggA=${aggA} aggB=${aggB}
-          brValor=${brValor} onSelect=${selecionar} setNivel=${setNivel} setModo=${setModo} setDuelo=${setDuelo}
+        <${A.Mapa} m=${m} nivel=${nivel} modo=${modo} duelo=${duelo} sel=${sel} escala=${escala} agg=${agg}
+          brValor=${brValor} rotuloArea=${rotuloArea} onSelect=${selecionar} setNivel=${setNivel} setModo=${setModo} setDuelo=${setDuelo}
           metKey=${metKey} setMetKey=${setMetKey} aba=${aba} />
       </main>` : html`<${A.Metodo} voltar=${() => setView("mapa")} />`}
     </div>`;
   }
 
-  render(html`<${App} />`, document.getElementById("app"));
+  const raiz = document.getElementById("app");
+  raiz.textContent = "";   // tira o "Carregando o mapa…"
+  render(html`<${App} />`, raiz);
+  A.montado = true;
 })(window.Atlas);
