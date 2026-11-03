@@ -15,7 +15,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Faustina:wght@500;600;700&family=Geist:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/estilo.css">
+<!-- ?v=... é a versão do site: ao publicar mudanças, troque a data em todos os arquivos abaixo,
+     para o navegador de quem já visitou baixar tudo de novo (e não misturar arquivo novo com antigo) -->
+<link rel="stylesheet" href="css/estilo.css?v=2026-11-03">
 
 <div id="app"><div class="carregando"><div><b>Atlas ENADE 2023</b>Carregando o mapa…</div></div></div>
 
@@ -26,19 +28,19 @@
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
 
 <!-- Dados gerados por scripts/exportar_dados.py a partir do banco -->
-<script src="dados/dados.js"></script>
-<script src="dados/auditoria.js"></script>
-<script src="dados/malha.js"></script>
+<script src="dados/dados.js?v=2026-11-03"></script>
+<script src="dados/auditoria.js?v=2026-11-03"></script>
+<script src="dados/malha.js?v=2026-11-03"></script>
 
 <!-- Aplicação (a ordem importa) -->
-<script src="js/config.js"></script>
-<script src="js/base.js"></script>
-<script src="js/geo.js"></script>
-<script src="js/componentes.js"></script>
-<script src="js/painel.js"></script>
-<script src="js/mapa.js"></script>
-<script src="js/metodo.js"></script>
-<script src="js/app.js"></script>
+<script src="js/config.js?v=2026-11-03"></script>
+<script src="js/base.js?v=2026-11-03"></script>
+<script src="js/geo.js?v=2026-11-03"></script>
+<script src="js/componentes.js?v=2026-11-03"></script>
+<script src="js/painel.js?v=2026-11-03"></script>
+<script src="js/mapa.js?v=2026-11-03"></script>
+<script src="js/metodo.js?v=2026-11-03"></script>
+<script src="js/app.js?v=2026-11-03"></script>
 
 <!-- Se uma biblioteca ou um arquivo de dados não carregou, mostra um aviso em vez de uma tela vazia -->
 <script>

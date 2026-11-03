@@ -68,6 +68,8 @@ O site usa Preact com htm, sem etapa de build. O mapa é desenhado em Canvas 2D 
 
 Em **Settings → Pages**, escolha publicar a partir da branch `main`, pasta `/ (root)`. O site fica em `https://<usuario>.github.io/<repositorio>/` (a página da raiz redireciona para `site/`).
 
+Ao publicar uma versão nova, troque a data do `?v=` em `site/index.html` (está em todos os arquivos do site). Assim o navegador de quem já visitou baixa tudo de novo, em vez de misturar arquivos novos com antigos guardados no cache.
+
 ## O banco no DBeaver (schema `gabriel`)
 
 **Tabelas** (dados do INEP com os códigos originais):
