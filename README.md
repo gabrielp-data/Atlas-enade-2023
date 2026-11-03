@@ -50,7 +50,7 @@ O site usa Preact com htm, sem etapa de build. O mapa é desenhado em Canvas 2D 
 
 ### Publicar no GitHub Pages
 
-Em **Settings → Pages**, escolha publicar a partir da branch `main`, pasta `/ (root)`. O site fica em `https://<usuario>.github.io/<repositorio>/site/`.
+Em **Settings → Pages**, escolha publicar a partir da branch `main`, pasta `/ (root)`. O site fica em `https://<usuario>.github.io/<repositorio>/` (a página da raiz redireciona para `site/`).
 
 ## O banco no DBeaver (schema `gabriel`)
 
