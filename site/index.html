@@ -1,0 +1,32 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Atlas ENADE 2023</title>
+<meta name="description" content="Mapa interativo dos cursos do ENADE 2023 por estado e município: nota, renda, escolaridade dos pais, perfil e avaliação do curso.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Faustina:wght@500;600;700&family=Geist:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/estilo.css">
+
+<div id="app"></div>
+
+<!-- Bibliotecas (versões fixas) -->
+<script src="https://cdn.jsdelivr.net/npm/preact@10.24.3/dist/preact.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/preact@10.24.3/hooks/dist/hooks.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/htm@3.1.1/dist/htm.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+
+<!-- Dados gerados por scripts/exportar_dados.py a partir do banco -->
+<script src="dados/dados.js"></script>
+<script src="dados/auditoria.js"></script>
+<script src="dados/malha.js"></script>
+
+<!-- Aplicação (a ordem importa) -->
+<script src="js/config.js"></script>
+<script src="js/base.js"></script>
+<script src="js/geo.js"></script>
+<script src="js/componentes.js"></script>
+<script src="js/painel.js"></script>
+<script src="js/mapa.js"></script>
+<script src="js/metodo.js"></script>
+<script src="js/app.js"></script>

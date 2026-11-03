@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+
+# Arquivos grandes ou temporários (os microdados do INEP não vão para o repositório)
+*.dump
+*.geojson
+*.txt
+!requirements.txt
+
+# Office e Windows
+~$*
+Thumbs.db
+desktop.ini
+
+# Segredos
+.env
