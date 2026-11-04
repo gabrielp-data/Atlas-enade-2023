@@ -1,0 +1,9 @@
+{
+  "name": "atlas-enade-2023",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/site.test.cjs",
+    "build": "node scripts/preparar_site.cjs"
+  },
+  "engines": { "node": ">=22" }
+}

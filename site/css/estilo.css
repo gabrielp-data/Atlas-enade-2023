@@ -93,6 +93,9 @@ button, input, select { font: inherit; color: inherit; }
 .sub { color: var(--tinta-3); font-size: 13px; }
 .copiar { flex-shrink: 0; background: var(--elev); border: 1px solid var(--linha); border-radius: 7px; padding: 5px 9px; font-size: 12px; color: var(--tinta-2); cursor: pointer; white-space: nowrap; }
 .copiar:hover { color: var(--tinta); }
+.copiar:disabled { opacity: .5; cursor: default; }
+.exportar { display: grid; justify-items: start; gap: 6px; }
+.exportar .copiar { white-space: normal; text-align: left; padding: 8px 12px; }
 .copiado { font-size: 12px; color: var(--tinta-2); }
 .copiado input { width: 100%; box-sizing: border-box; margin-top: 4px; background: var(--elev); border: 1px solid var(--linha); border-radius: 6px; padding: 5px 8px; font-size: 12px; }
 .manchete { font-family: var(--serif); font-size: 19px; line-height: 1.35; color: var(--tinta-2); margin: 4px 0 0; text-wrap: pretty; }

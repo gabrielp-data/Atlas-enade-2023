@@ -136,6 +136,28 @@
     return n > 0 && (m.respondentes ? C[m.respondentes][i] : n) >= A.MIN_CURSO ? C[m.s][i] / n * m.fatorEfetivo : null;
   };
 
+  // A distribuição inclui os extremos: nenhum curso é colocado numa faixa falsa.
+  A.dominioHistograma = (m, valores) => {
+    if (!valores.length) return [0, 1];
+    const passo = m.tipo === "pct" ? 10 : m.tipo === "escala" ? 0.5 : 5;
+    const lo = Math.floor(Math.min(...valores) / passo) * passo;
+    const hi = Math.ceil(Math.max(...valores) / passo) * passo;
+    return hi > lo ? [lo, hi] : [lo, lo + passo];
+  };
+  A.distribuirHistograma = (valores, [lo, hi], quantidade = 24) => {
+    const bins = new Array(quantidade).fill(0), passo = (hi - lo) / quantidade;
+    for (const v of valores) {
+      if (!Number.isFinite(v) || v < lo || v > hi) throw new RangeError("Valor fora da faixa do histograma");
+      bins[Math.min(quantidade - 1, Math.floor((v - lo) / passo))]++;
+    }
+    return { bins, passo };
+  };
+  A.resumoNotas = () => {
+    const presentes = (window.AUDITORIA.presenca.find(p => p[0] === 555) || [0, "", 0])[2];
+    const validas = C.n_ger.reduce((s, n) => s + n, 0);
+    return { presentes, validas, semNota: presentes - validas };
+  };
+
   // Refaz no navegador as médias que o exportador calculou direto no banco (auditoria.js).
   // Se alguma não bater, o site avisa: pega erro de escala, de fator ou de exportação.
   A.conferirDados = () => {

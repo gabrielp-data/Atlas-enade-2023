@@ -5,41 +5,7 @@
   const { useState, useMemo, useEffect } = window.preactHooks;
   const html = A.html, C = A.C, NC = A.NC, D = A.D;
 
-  // ───────── Link compartilhável ─────────
-  // Ex.: #ger-a12-ufmg = nota geral, Medicina, Minas Gerais. Só letras, números e hífen (o Claude só repassa esse formato).
-  const PADRAO = { view: "mapa", met: "ger", filtro: { grupo: -1, area: 0 }, nivel: "uf", modo: "valor", duelo: "rede", sel: { tipo: "br" } };
-  function lerHash() {
-    const st = JSON.parse(JSON.stringify(PADRAO));
-    for (const t of location.hash.replace(/^#/, "").split("-").filter(Boolean)) {
-      if (t === "metodo") st.view = "metodo";
-      else if (A.METRICAS[t]) st.met = t;
-      else if (t === "municipios") st.nivel = "mun";
-      else if (t === "comparado") st.modo = "dif";
-      else if (A.DUELOS[t]) { st.modo = "duelo"; st.duelo = t; }
-      else if (/^a\d+$/.test(t) && A.NOME_AREA[+t.slice(1)]) { const c = +t.slice(1); st.filtro = { grupo: A.GRUPO_DA_AREA[c], area: c }; }
-      else if (/^g\d$/.test(t) && D.grupos[+t.slice(1)]) st.filtro = { grupo: +t.slice(1), area: 0 };
-      else if (/^r[1-5]$/.test(t)) st.sel = { tipo: "reg", reg: t.slice(1) };
-      else if (/^m\d{7}$/.test(t) && D.municipios[t.slice(1)]) st.sel = { tipo: "mun", uf: t.slice(1, 3), mun: t.slice(1) };
-      else if (/^i\d+$/.test(t) && D.ies[t.slice(1)]) st.sel = { tipo: "ies", ies: t.slice(1) };
-      else if (/^uf[a-z]{2}$/.test(t) && A.ufDaSigla[t.slice(2)]) st.sel = { tipo: "uf", uf: A.ufDaSigla[t.slice(2)] };
-    }
-    if (st.sel.tipo === "mun") st.nivel = "mun";
-    return st;
-  }
-  function montarToken(st) {
-    if (st.view === "metodo") return "metodo";
-    const t = [st.met];
-    if (st.filtro.area) t.push("a" + st.filtro.area); else if (st.filtro.grupo >= 0) t.push("g" + st.filtro.grupo);
-    if (st.nivel === "mun" && st.sel.tipo !== "mun") t.push("municipios");
-    if (st.modo === "dif") t.push("comparado");
-    if (st.modo === "duelo") t.push(st.duelo);
-    const s = st.sel;
-    if (s.tipo === "reg") t.push("r" + s.reg);
-    if (s.tipo === "uf") t.push("uf" + A.ufSigla(s.uf).toLowerCase());
-    if (s.tipo === "mun") t.push("m" + s.mun);
-    if (s.tipo === "ies") t.push("i" + s.ies);
-    return t.join("-");
-  }
+  const lerHash = () => A.lerEstado(location.hash);
   A.linkPublico = token => {
     const local = location.protocol === "file:" || /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
     return (local ? location.href.split("#")[0] : A.URL_PUBLICA) + (token ? "#" + token : "");
@@ -67,16 +33,10 @@
     const histDom = useMemo(() => {
       const vs = [];
       for (let i = 0; i < NC; i++) if (passa(i)) { const v = A.valorCurso(m, i); if (v != null) vs.push(v); }
-      vs.sort((a, b) => a - b);
-      if (!vs.length) return [0, 1];
-      let lo = vs[Math.floor(0.01 * (vs.length - 1))], hi = vs[Math.ceil(0.99 * (vs.length - 1))];
-      if (m.tipo === "pct") { lo = Math.max(0, Math.floor(lo / 10) * 10); hi = Math.min(100, Math.ceil(hi / 10) * 10); }
-      else if (m.tipo === "escala") { lo = Math.floor(lo * 2) / 2; hi = Math.ceil(hi * 2) / 2; }
-      else { lo = Math.floor(lo / 5) * 5; hi = Math.ceil(hi / 5) * 5; }
-      return hi > lo ? [lo, hi] : [lo, lo + 1];
+      return A.dominioHistograma(m, vs);
     }, [m, passa]);
 
-    const token = montarToken({ view, met: metKey, filtro, nivel, modo, duelo, sel });
+    const token = A.montarToken({ view, met: metKey, filtro, nivel, modo, duelo, sel });
     useEffect(() => {
       try { history.replaceState(null, "", "#" + token); } catch (e) { /* alguns visualizadores bloqueiam */ }
     }, [token]);

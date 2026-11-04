@@ -16,18 +16,19 @@ Rode este arquivo e ele faz tudo, na ordem:
   10. Gera os dicionários de dados ...... dicionario/ (Excel e HTML)
 
 Como rodar:
-    python montar_banco.py                -> monta tudo (uns 3 minutos)
+    python montar_banco.py                -> monta em uma base ainda vazia
+    python montar_banco.py --recriar      -> substitui as tabelas deste projeto
     python montar_banco.py --dicionario   -> só gera os dicionários de novo
 
 A senha do PostgreSQL é pedida na hora (ou lida da variável PGPASSWORD).
 """
+import argparse
 import datetime
 import getpass
 import html
 import io
 import os
 import re
-import sys
 import warnings
 from decimal import Decimal
 
@@ -176,6 +177,20 @@ def passo(n, texto):
 def executar_arquivo_sql(cur, nome):
     with open(os.path.join(PASTA_SQL, nome), encoding="utf-8") as f:
         cur.execute(f.read())
+
+
+def preparar_montagem(cur, recriar=False):
+    """Nunca substitui uma base existente sem a opção explícita --recriar."""
+    cur.execute("""SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+                   WHERE n.nspname = %s AND c.relname = ANY(%s)""", (SCHEMA, ORDEM_TABELAS))
+    existentes = [r[0] for r in cur.fetchall()]
+    if existentes and not recriar:
+        raise SystemExit("A base já existe e foi preservada. Para atualizar o site, use "
+                         "site/scripts/exportar_dados.py; para refazer o dicionário, use --dicionario. "
+                         "Para substituir explicitamente as tabelas deste projeto, use --recriar.")
+    if recriar:
+        cur.execute("SELECT set_config('atlas.recriar', 'sim', true)")
+        executar_arquivo_sql(cur, "00_recriar_tabelas.sql")
 
 
 def colunas(cur, tabela):
@@ -1150,54 +1165,63 @@ def gerar_dicionarios(cur, tamanhos):
 
 # ── Execução ────────────────────────────────────────────────────────────────
 def main():
+    parser = argparse.ArgumentParser(description="Monta a base ENADE 2023 sem substituir tabelas existentes por padrão.")
+    modo = parser.add_mutually_exclusive_group()
+    modo.add_argument("--dicionario", action="store_true", help="Refaz só os dicionários da base atual.")
+    modo.add_argument("--recriar", action="store_true", help="Substitui explicitamente as tabelas deste projeto na mesma transação da carga.")
+    args = parser.parse_args()
     conn = conectar()
-    cur = conn.cursor()
+    try:
+        cur = conn.cursor()
+        if not args.dicionario:
+            preparar_montagem(cur, args.recriar)
 
-    desc_enade, cats_enade, municipios, tam_enade = ler_dicionario_enade()
-    desc_censo, cats_censo, tam_censo = ler_dicionario_censo()
-    tamanhos = {**tam_censo, **tam_enade}
+        desc_enade, cats_enade, municipios, tam_enade = ler_dicionario_enade()
+        desc_censo, cats_censo, tam_censo = ler_dicionario_censo()
+        tamanhos = {**tam_censo, **tam_enade}
 
-    if "--dicionario" in sys.argv:
+        if args.dicionario:
+            passo(10, "Gerando os dicionários de dados")
+            gerar_dicionarios(cur, tamanhos)
+            return
+
+        passo(1, "Criando as tabelas")
+        executar_arquivo_sql(cur, "01_criar_tabelas.sql")
+
+        passo(2, "Carregando a tabela de categorias (dicionários do INEP)")
+        carregar_categorias(cur, cats_enade, municipios, cats_censo)
+
+        passo(3, "Carregando o cadastro de IES (Censo 2023)")
+        carregar_ies(cur)
+
+        passo(4, "Carregando os arquivos do ENADE")
+        carregar_arquivos_enade(cur)
+
+        passo(5, "Montando o cadastro de cursos")
+        executar_arquivo_sql(cur, "02_montar_cadastro_curso.sql")
+
+        passo(6, "Criando as chaves estrangeiras e índices")
+        executar_arquivo_sql(cur, "03_chaves_estrangeiras.sql")
+
+        passo(7, "Criando as views")
+        gerar_views(cur)
+
+        passo(8, "Gravando a descrição de cada tabela e coluna")
+        sem_descricao = gerar_comentarios(cur, desc_enade, desc_censo)
+
+        passo(9, "Conferindo")
+        conferir(cur, sem_descricao)
+        conn.commit()
+        cur.execute("ANALYZE")
+        conn.commit()
+
         passo(10, "Gerando os dicionários de dados")
         gerar_dicionarios(cur, tamanhos)
+
+        print("\nPronto! Abra o DBeaver e dê F5 no schema gabriel.")
+
+    finally:
         conn.close()
-        return
-
-    passo(1, "Criando as tabelas")
-    executar_arquivo_sql(cur, "01_criar_tabelas.sql")
-
-    passo(2, "Carregando a tabela de categorias (dicionários do INEP)")
-    carregar_categorias(cur, cats_enade, municipios, cats_censo)
-
-    passo(3, "Carregando o cadastro de IES (Censo 2023)")
-    carregar_ies(cur)
-
-    passo(4, "Carregando os arquivos do ENADE")
-    carregar_arquivos_enade(cur)
-
-    passo(5, "Montando o cadastro de cursos")
-    executar_arquivo_sql(cur, "02_montar_cadastro_curso.sql")
-
-    passo(6, "Criando as chaves estrangeiras e índices")
-    executar_arquivo_sql(cur, "03_chaves_estrangeiras.sql")
-
-    passo(7, "Criando as views")
-    gerar_views(cur)
-
-    passo(8, "Gravando a descrição de cada tabela e coluna")
-    sem_descricao = gerar_comentarios(cur, desc_enade, desc_censo)
-
-    passo(9, "Conferindo")
-    conferir(cur, sem_descricao)
-    conn.commit()
-    cur.execute("ANALYZE")
-    conn.commit()
-
-    passo(10, "Gerando os dicionários de dados")
-    gerar_dicionarios(cur, tamanhos)
-
-    conn.close()
-    print("\nPronto! Abra o DBeaver e dê F5 no schema gabriel.")
 
 
 if __name__ == "__main__":

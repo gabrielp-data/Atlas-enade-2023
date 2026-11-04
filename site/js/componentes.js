@@ -57,9 +57,7 @@
     const [foco, setFoco] = useState(null);
     const W = 340, H = 120, x0 = 6, x1 = W - 6, y0 = 8, y1 = 92, NB = 24;
     const [lo, hi] = dom;
-    const passo = (hi - lo) / NB;
-    const bins = new Array(NB).fill(0);
-    for (const v of valores) bins[Math.min(NB - 1, Math.max(0, Math.floor((v - lo) / passo)))]++;
+    const { bins, passo } = A.distribuirHistograma(valores, dom, NB);
     const maxB = Math.max(1, ...bins);
     const X = v => x0 + (x1 - x0) * (v - lo) / (hi - lo);
     const bw = (x1 - x0) / NB;

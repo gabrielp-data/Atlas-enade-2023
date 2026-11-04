@@ -18,7 +18,7 @@
       } catch (e) { falhou(); }
     };
     return html`<div>
-      <button class="copiar" onClick=${copiar} title="Copia um link que abre o site exatamente nesta visão">
+      <button class="copiar" onClick=${copiar} title="Copia um link com o lugar, os filtros e a divisão do mapa selecionados">
         ${estado && estado.ok ? "Link copiado" : "Copiar link"}
       </button>
       ${estado && !estado.ok && html`<div class="copiado">Copie o link:
@@ -30,7 +30,9 @@
     const { m, agg, sel, passa, filtro, pedacos, brValor, escala, histDom, onSelect, token, irMetodo } = p;
     const [ordem, setOrdem] = useState("maiores");
     const [limite, setLimite] = useState(10);
+    const [csvStatus, setCsvStatus] = useState("");
     useEffect(() => setLimite(10), [sel, m, passa, ordem]);
+    useEffect(() => setCsvStatus(""), [sel, m, passa]);
 
     const x = A.aggDaSelecao(agg, sel);
     const min = A.minDaSelecao(sel);
@@ -98,6 +100,17 @@
         <div><dt>Estudantes</dt><dd>${A.nf0.format(x ? x.est : 0)}</dd></div>
         <div><dt>${rotuloN}</dt><dd>${A.nf0.format(Math.round(A.pessoas(m, x)))}</dd></div>
       </dl>
+
+      <div class="exportar">
+        <button class="copiar" disabled=${lista.length === 0} onClick=${() => {
+          try {
+            const n = A.baixarCSV({ m, sel, passa });
+            setCsvStatus(`CSV preparado com ${A.nf0.format(n)} cursos.`);
+          } catch (e) { setCsvStatus("Não foi possível baixar. Tente novamente."); }
+        }}>Baixar cursos da seleção (CSV)</button>
+        <p class="explica">Todos os cursos desta área e deste lugar. Valores com menos de ${A.MIN_CURSO} pessoas ficam em branco, com o motivo indicado.</p>
+        <span class="explica" role="status">${csvStatus}</span>
+      </div>
 
       <section class="bloco">
         <h3>Comparações</h3>

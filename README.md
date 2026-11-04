@@ -34,7 +34,7 @@ Precisa de PostgreSQL, Python 3 e dos microdados baixados do portal de dados abe
 - **Variáveis de ambiente:** `ENADE_DIR` e `CENSO_DIR` com o caminho das pastas extraídas.
 
 ```bash
-pip install pandas psycopg2 openpyxl
+pip install -r requirements.txt
 python montar_banco.py
 ```
 
@@ -46,7 +46,9 @@ O script pede a senha do PostgreSQL e faz tudo em uns 3 minutos:
 4. grava a descrição de cada coluna;
 5. confere tudo e gera os dicionários.
 
-Se algum passo der erro, nada é alterado no banco. Para só refazer os dicionários: `python montar_banco.py --dicionario`.
+Se as tabelas já existirem, o comando para e preserva a base. Para só refazer os dicionários: `python montar_banco.py --dicionario`.
+
+**Recriar é uma operação separada:** `python montar_banco.py --recriar` substitui explicitamente as tabelas deste projeto e recarrega os arquivos originais. A limpeza usa uma lista fechada e `RESTRICT`: outras tabelas `inep_*` não são apagadas, e dependências externas impedem a recriação. A limpeza e a carga ficam na mesma transação; erros antes da confirmação desfazem as mudanças. Os dicionários são gerados depois dessa confirmação: uma falha ao gravar o Excel não desfaz uma carga já concluída.
 
 ## Como atualizar o site
 
@@ -64,11 +66,28 @@ Ele gera `site/dados/dados.js` (números por curso), `site/dados/auditoria.js` (
 
 O site usa Preact com htm, sem etapa de build. O mapa é desenhado em Canvas 2D a partir da malha oficial dos municípios do IBGE, simplificada com mapshaper e salva em TopoJSON. A tipografia é Faustina e Geist.
 
+Com o mouse sobre o mapa, role para baixo para afastar e para cima para aproximar. O afastamento para no enquadramento do Brasil; o lugar selecionado no painel é mantido. Ctrl/Command + roda continua controlando o zoom do navegador. O link compartilhável guarda os filtros, o lugar e a divisão do mapa; o zoom manual é ajustado ao abrir.
+
 ### Publicar no GitHub Pages
 
-Em **Settings → Pages**, escolha publicar a partir da branch `main`, pasta `/ (root)`. O site fica em `https://<usuario>.github.io/<repositorio>/` (a página da raiz redireciona para `site/`).
+Em **Settings → Pages → Source**, escolha **GitHub Actions**. O workflow `.github/workflows/pages.yml` roda os testes e só publica se todos passarem. O endereço permanece `https://<usuario>.github.io/<repositorio>/` (a página da raiz redireciona para `site/`).
 
-Ao publicar uma versão nova, troque a data do `?v=` em `site/index.html` (está em todos os arquivos do site). Assim o navegador de quem já visitou baixa tudo de novo, em vez de misturar arquivos novos com antigos guardados no cache.
+O pacote de publicação contém apenas a página inicial e o site. A versão de cache dos arquivos é calculada automaticamente a partir do conteúdo: novas mudanças recebem outro `?v=`. A preparação é feita por `npm run build`, que também executa os testes do site e gera `_site/` em uma pasta de trabalho limpa. Para abrir diretamente os arquivos locais sem essa preparação, mantenha o `?v=` uniforme em `site/index.html`.
+
+### Testes
+
+Precisa de Node.js 22 ou superior, além das dependências Python:
+
+```bash
+npm test
+python -m unittest discover -s tests -p "test_*.py" -v
+```
+
+Os testes cobrem as conferências com a exportação do banco, histogramas completos, links compartilháveis e CSV. A integração SQL usa `TEST_DATABASE_URL`, cria schemas temporários com nomes aleatórios e desfaz tudo com `ROLLBACK`; sem essa variável, os testes de integração são ignorados. No GitHub Actions, eles sempre rodam em um PostgreSQL 18 isolado, sem acesso à base do TCC.
+
+### Baixar os dados filtrados
+
+No painel, **Baixar cursos da seleção (CSV)** exporta todos os cursos da área e do lugar escolhidos, com o indicador atual. O arquivo usa ponto e vírgula, vírgula decimal e UTF-8 com BOM para abrir no Excel. Traz nomes, códigos, unidade, contagens e fonte. Cursos com menos de 20 pessoas com dado válido permanecem no arquivo com o valor vazio e o motivo registrado; zero continua sendo zero. Na avaliação, pessoas e respostas aos itens aparecem em colunas diferentes. No modo Duelo, as duas redes/modalidades são incluídas e identificadas nas respectivas colunas.
 
 ## O banco no DBeaver (schema `gabriel`)
 

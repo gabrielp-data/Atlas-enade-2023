@@ -14,7 +14,7 @@
     const arquivosOk = AU.arquivos.every(a => a.linhas_arquivo === a.linhas_banco && a.colunas_iguais);
     const conf = A.conferirDados();   // refeito agora, no navegador de quem abre a página
     const confOk = conf.length > 0 && conf.every(c => c.ok);
-    const presentes = AU.presenca.find(p => p[0] === 555);
+    const notas = A.resumoNotas();
     const ausentes = AU.presenca.find(p => p[0] === 222);
     const cursosFora = AU.ies_fora.reduce((s, x) => s + x[1], 0);
     const estFora = AU.ies_fora.reduce((s, x) => s + x[2], 0);
@@ -73,11 +73,13 @@
         <section>
           <h2>Como cada número é calculado</h2>
           <p>Os valores de um estado, região ou município são calculados somando os cursos daquele lugar, e não tirando a média das médias. Assim, um curso com 300 estudantes pesa mais que um com 10.</p>
-          <div class="formula">nota média do lugar = soma das notas dos presentes ÷ número de presentes
+          <div class="formula">nota média do lugar = soma das notas válidas dos presentes ÷ quantidade dessas notas
 % de um grupo       = estudantes do grupo ÷ estudantes que responderam × 100</div>
           <p>Para evitar números instáveis, um lugar só ganha cor com pelo menos <strong>${A.MIN_LOCAL} respostas</strong>, e um curso só entra no ranking com pelo menos <strong>${A.MIN_CURSO}</strong>.
-          ${n0(AU.cursos_poucos_presentes)} dos ${n0(AU.cursos)} cursos têm menos de ${A.MIN_CURSO} presentes na prova.</p>
-          <p>Notas contam só os presentes com resultado válido: ${n0(presentes ? presentes[2] : 0)} estudantes.
+          ${n0(AU.cursos_poucos_presentes)} dos ${n0(AU.cursos)} cursos têm menos de ${A.MIN_CURSO} notas gerais válidas.</p>
+          <p>Há ${n0(notas.presentes)} estudantes classificados como presentes (TP_PRES = 555).
+          Destes, ${n0(notas.validas)} têm nota geral preenchida e entram nessa média; ${n0(notas.semNota)} não têm nota geral e ficam de fora.
+          Cada indicador de nota usa sua própria quantidade de resultados preenchidos.
           Os ${n0(ausentes ? ausentes[2] : 0)} ausentes e os casos de dispensa ficam de fora da média.</p>
           <p><strong>Rede pública</strong> reúne as categorias federal, estadual, municipal e especial (todas são rede pública no Censo 2023):
           ${n0(AU.rede.publica[0])} cursos e ${n0(AU.rede.publica[1])} estudantes. A <strong>rede privada</strong> tem ${n0(AU.rede.privada[0])} cursos e ${n0(AU.rede.privada[1])} estudantes.

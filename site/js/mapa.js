@@ -103,7 +103,7 @@
 
     function rotulos(ctx, v, dpr, W, H, p) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const emBrasil = p.sel.tipo === "br" && Math.abs(v.s - base.current.s) / base.current.s < 0.02;
+      const emBrasil = Math.abs(v.s - base.current.s) / base.current.s < 0.02;
       const compacto = v.s < 7.5; // mapa pequeno (celular): rótulos mais curtos
       const caixas = [];
       ctx.textAlign = "center";
@@ -113,7 +113,9 @@
         const d = A.DESLOCA[u.id] || [0, 0];
         const x = v.s * (u.c[0] + d[0]) + v.tx, y = v.s * (u.c[1] + d[1]) + v.ty;
         if (x < -30 || x > W + 30 || y < -30 || y > H + 30) continue;
-        ctx.fillStyle = c && c.L > 0.72 ? "#0d0e10" : "#f1f0eb";
+        const foraDoFoco = p.sel.tipo === "uf" || p.sel.tipo === "mun" ? u.id !== p.sel.uf
+          : p.sel.tipo === "reg" ? u.id[0] !== p.sel.reg : false;
+        ctx.fillStyle = !foraDoFoco && c && c.L > 0.72 ? "#0d0e10" : "#f1f0eb";
         if (compacto) { ctx.font = `600 10px ${FONTE}`; ctx.fillText(A.ufSigla(u.id), x, y + 4); continue; }
         const txt = rotuloValor(p, val, false);
         ctx.font = `600 12px ${FONTE}`;
@@ -196,12 +198,31 @@
       ro.observe(topo.current);          // controles mudam de altura (ex.: abre a escolha do duelo)
       ro.observe(caixaLegenda.current);  // a legenda do duelo é mais alta
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(pedirDesenho);
-      return () => ro.disconnect();
+      return () => { ro.disconnect(); cancelAnimationFrame(anim.current); cancelAnimationFrame(agenda.current); };
     }, []);
     useEffect(() => { if (base.current) irPara(alvo(sel)); }, [sel]);
     useEffect(() => { if (base.current) { reenquadrar(); pedirDesenho(); } }, [modo, aba]);
     useEffect(() => { pedirDesenho(); }, [escala, nivel, m]);
     useEffect(() => { desenharRealce(); }, [dica]);
+
+    useEffect(() => {
+      const cv = realce.current;
+      const rolar = ev => {
+        // Ctrl/Command + roda continua sendo o zoom do navegador.
+        if (ev.ctrlKey || ev.metaKey || !vista.current || !base.current) return;
+        const r = cv.getBoundingClientRect();
+        const delta = ev.deltaY * (ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? r.height : 1);
+        const proxima = A.zoomDaRoda(vista.current, base.current, delta, ev.clientX - r.left, ev.clientY - r.top);
+        if (proxima === vista.current) return;
+        ev.preventDefault();
+        cancelAnimationFrame(anim.current);
+        vista.current = proxima;
+        setDica(null);
+        pedirDesenho();
+      };
+      cv.addEventListener("wheel", rolar, { passive: false });
+      return () => cv.removeEventListener("wheel", rolar);
+    }, []);
 
     // ── mouse ──
     function acertar(ev) {
@@ -283,7 +304,7 @@
       <canvas ref=${tela} class="camada-mapa" aria-hidden="true"></canvas>
       <canvas ref=${realce} role="img" aria-label=${`Mapa do Brasil: ${m.rotulo}${naArea} ${porOnde}`} aria-describedby="mapa-ajuda"
         onMouseMove=${mover} onMouseLeave=${() => setDica(null)} onClick=${clicar}></canvas>
-      <p id="mapa-ajuda" class="so-leitor">Clique num estado ou município para ver os detalhes no painel. Pelo teclado, use a tabela por estado no fim do painel.</p>
+      <p id="mapa-ajuda" class="so-leitor">Clique num estado ou município para ver os detalhes no painel. Role para baixo para afastar o mapa e para cima para aproximar. Pelo teclado, use a tabela por estado no fim do painel.</p>
       <div class="mapa-topo" ref=${topo}>
         <div class="grupo-seg">
           ${abaAtual.metricas.length > 1 && html`<div class="seg" role="group" aria-label="Indicador">

@@ -10,30 +10,8 @@
 CREATE SCHEMA IF NOT EXISTS gabriel;
 SET search_path TO gabriel;
 
--- ---------------------------------------------------------------------
--- Limpeza: apaga as tabelas e views de versões anteriores do projeto
--- ---------------------------------------------------------------------
-DO $$
-DECLARE r record;
-BEGIN
-    FOR r IN
-        SELECT c.relname, c.relkind
-        FROM pg_class c
-        JOIN pg_namespace n ON n.oid = c.relnamespace
-        WHERE n.nspname = 'gabriel'
-          AND c.relkind IN ('r', 'v', 'm')
-          AND (c.relname LIKE 'inep\_%' OR c.relname = 'estudantes_completo')
-    LOOP
-        IF r.relkind = 'v' THEN
-            EXECUTE format('DROP VIEW IF EXISTS gabriel.%I CASCADE', r.relname);
-        ELSIF r.relkind = 'm' THEN
-            EXECUTE format('DROP MATERIALIZED VIEW IF EXISTS gabriel.%I CASCADE', r.relname);
-        ELSE
-            EXECUTE format('DROP TABLE IF EXISTS gabriel.%I CASCADE', r.relname);
-        END IF;
-    END LOOP;
-END $$;
-
+-- Este arquivo só cria tabelas. Se elas já existem, a execução para sem apagá-las.
+-- Recriação explícita: python montar_banco.py --recriar
 
 -- =====================================================================
 -- TABELA DE CATEGORIAS — significado de todos os códigos
