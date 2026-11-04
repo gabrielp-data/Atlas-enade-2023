@@ -241,7 +241,10 @@
     const clicar = ev => {
       const a = acertar(ev);
       if (!a) return;
-      onSelect(a.tipo === "uf" ? { tipo: "uf", uf: a.id } : { tipo: "mun", uf: a.uf, mun: a.id });
+      const escolhido = a.tipo === "uf" ? { tipo: "uf", uf: a.id } : { tipo: "mun", uf: a.uf, mun: a.id };
+      const mesmoLugar = sel.tipo === escolhido.tipo && (a.tipo === "uf" ? sel.uf === a.id : sel.mun === a.id);
+      setDica(null);
+      onSelect(mesmoLugar ? { tipo: "br" } : escolhido);
     };
 
     // ── dica ──
@@ -271,7 +274,8 @@
         <div class="lugar">${nome}${!ehUf && html`<small>${A.ufSigla(dica.uf)}</small>`}</div>
         ${corpo}
         ${z && html`<div class="n">${A.nf0.format(z.cursos)} ${z.cursos === 1 ? "curso" : "cursos"} · ${A.nf0.format(z.est)} estudantes</div>`}
-        <div class="n">Clique para ver os detalhes</div>
+        <div class="n">${sel.tipo === dica.tipo && (ehUf ? sel.uf === dica.id : sel.mun === dica.id)
+          ? "Clique novamente para desmarcar" : "Clique para ver os detalhes"}</div>
       </div>`;
     }
 
@@ -304,7 +308,7 @@
       <canvas ref=${tela} class="camada-mapa" aria-hidden="true"></canvas>
       <canvas ref=${realce} role="img" aria-label=${`Mapa do Brasil: ${m.rotulo}${naArea} ${porOnde}`} aria-describedby="mapa-ajuda"
         onMouseMove=${mover} onMouseLeave=${() => setDica(null)} onClick=${clicar}></canvas>
-      <p id="mapa-ajuda" class="so-leitor">Clique num estado ou município para ver os detalhes no painel. Role para baixo para afastar o mapa e para cima para aproximar. Pelo teclado, use a tabela por estado no fim do painel.</p>
+      <p id="mapa-ajuda" class="so-leitor">Clique num estado ou município para ver os detalhes no painel. Clique novamente no lugar selecionado para desmarcar e voltar ao Brasil. Role para baixo para afastar o mapa e para cima para aproximar. Pelo teclado, use a tabela por estado no fim do painel.</p>
       <div class="mapa-topo" ref=${topo}>
         <div class="grupo-seg">
           ${abaAtual.metricas.length > 1 && html`<div class="seg" role="group" aria-label="Indicador">

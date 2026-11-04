@@ -66,7 +66,7 @@ Ele gera `site/dados/dados.js` (números por curso), `site/dados/auditoria.js` (
 
 O site usa Preact com htm, sem etapa de build. O mapa é desenhado em Canvas 2D a partir da malha oficial dos municípios do IBGE, simplificada com mapshaper e salva em TopoJSON. A tipografia é Faustina e Geist.
 
-Com o mouse sobre o mapa, role para baixo para afastar e para cima para aproximar. O afastamento para no enquadramento do Brasil; o lugar selecionado no painel é mantido. Ctrl/Command + roda continua controlando o zoom do navegador. O link compartilhável guarda os filtros, o lugar e a divisão do mapa; o zoom manual é ajustado ao abrir.
+Clique num estado ou município para selecionar; clique novamente no mesmo lugar para desmarcar e voltar à visão do Brasil. A área, o indicador e a divisão do mapa são mantidos. Com o mouse sobre o mapa, role para baixo para afastar e para cima para aproximar. O afastamento para no enquadramento do Brasil; o lugar selecionado no painel é mantido. Ctrl/Command + roda continua controlando o zoom do navegador. O link compartilhável guarda os filtros, o lugar e a divisão do mapa; o zoom manual é ajustado ao abrir.
 
 ### Publicar no GitHub Pages
 
