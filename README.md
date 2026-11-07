@@ -89,6 +89,51 @@ Os testes cobrem as conferências com a exportação do banco, histogramas compl
 
 No painel, **Baixar cursos da seleção (CSV)** exporta todos os cursos da área e do lugar escolhidos, com o indicador atual. O arquivo usa ponto e vírgula, vírgula decimal e UTF-8 com BOM para abrir no Excel. Traz nomes, códigos, unidade, contagens e fonte. Cursos com menos de 20 pessoas com dado válido permanecem no arquivo com o valor vazio e o motivo registrado; zero continua sendo zero. Na avaliação, pessoas e respostas aos itens aparecem em colunas diferentes. No modo Duelo, as duas redes/modalidades são incluídas e identificadas nas respectivas colunas.
 
+## Rodar em containers (Docker)
+
+Serve para um servidor Linux, como uma EC2 de 8 GB na AWS. São três containers:
+
+| Container | O que faz |
+|---|---|
+| `banco` | PostgreSQL 18. Os dados ficam no volume `banco` e a porta 5432 só aceita conexões da própria máquina. |
+| `site` | O mapa, servido pelo nginx na porta 80 |
+| `carga` | Os scripts Python. Só roda quando chamado. |
+
+Com Docker instalado:
+
+```bash
+git clone https://github.com/gabrielp-data/Atlas-enade-2023.git
+cd Atlas-enade-2023
+cp .env.example .env          # edite e defina a senha do banco
+docker compose up -d
+```
+
+Na primeira vez, o banco é restaurado a partir de `docker/enade2023.dump` (38 MB). O backup traz o schema `gabriel` completo: tabelas, chaves, views e descrições. A restauração leva alguns minutos e você pode acompanhar com `docker compose logs -f banco`. Depois disso:
+
+- o site fica em http://localhost;
+- o banco fica em `localhost:5432`.
+
+Os microdados do INEP não são necessários.
+
+**Montar o banco do zero, em vez de usar o backup:** coloque os microdados em `fontes/enade` e `fontes/censo` e rode `docker compose run --rm carga python montar_banco.py --recriar`.
+
+**Gerar um backup novo** depois de mudar o banco, no Windows:
+
+```powershell
+pg_dump -h localhost -U postgres -d postgres -n gabriel -Fc -Z 9 --no-owner --no-privileges -f docker/enade2023.dump
+```
+
+Para atualizar o site depois de mudar o banco:
+
+```bash
+docker compose run --rm carga python site/scripts/exportar_dados.py
+docker compose up -d --build site
+```
+
+Para atualizar o código, use `git pull` seguido de `docker compose up -d --build site`.
+
+**DBeaver:** no mesmo computador, conecte direto em `localhost`. Num servidor (AWS), abra a aba **SSH** e informe o endereço do servidor, o usuário e a chave. Em **Main**, use host `localhost`, porta `5432`, banco `postgres` e usuário `postgres`, com a senha do `.env`.
+
 ## O banco no DBeaver (schema `gabriel`)
 
 **Tabelas** (dados do INEP com os códigos originais):

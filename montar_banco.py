@@ -42,7 +42,12 @@ from openpyxl.worksheet.hyperlink import Hyperlink
 warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 
 # ── Configuração ────────────────────────────────────────────────────────────
-HOST, PORTA, BANCO, USUARIO, SCHEMA = "localhost", 5432, "postgres", "postgres", "gabriel"
+# Conexão: padrão é o PostgreSQL local; no Docker, PGHOST etc. vêm do docker-compose.yml
+HOST = os.getenv("PGHOST", "localhost")
+PORTA = int(os.getenv("PGPORT", "5432"))
+BANCO = os.getenv("PGDATABASE", "postgres")
+USUARIO = os.getenv("PGUSER", "postgres")
+SCHEMA = "gabriel"
 
 PASTA_ENADE = os.getenv("ENADE_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "fontes", "enade"))
 PASTA_DADOS_ENADE = os.path.join(PASTA_ENADE, "DADOS")

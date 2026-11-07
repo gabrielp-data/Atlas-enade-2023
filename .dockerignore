@@ -1,0 +1,9 @@
+.git
+.github
+.env
+fontes
+_site
+dicionario
+**/__pycache__
+*.dump
+node_modules

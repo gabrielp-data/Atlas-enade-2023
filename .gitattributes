@@ -1,0 +1,4 @@
+# Scripts usados dentro dos containers Linux precisam de fim de linha LF
+*.sh text eol=lf
+docker/nginx.conf text eol=lf
+*.dump binary

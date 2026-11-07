@@ -273,7 +273,8 @@ def conferir_exportacao(cur, cursos):
 
 def main():
     senha = os.environ.get("PGPASSWORD") or getpass.getpass("Senha do PostgreSQL: ")
-    conn = psycopg2.connect(host="localhost", dbname="postgres", user="postgres", password=senha,
+    conn = psycopg2.connect(host=os.getenv("PGHOST", "localhost"), port=int(os.getenv("PGPORT", "5432")),
+                            dbname=os.getenv("PGDATABASE", "postgres"), user=os.getenv("PGUSER", "postgres"), password=senha,
                             options=f"-csearch_path={SCHEMA}")
     cur = conn.cursor()
 

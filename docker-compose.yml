@@ -1,0 +1,58 @@
+# Atlas ENADE 2023 em containers.
+#   banco: PostgreSQL 18 (dados ficam no volume "banco")
+#   site:  o mapa, servido pelo nginx na porta 80
+#   carga: os scripts Python; roda só quando chamado (docker compose run)
+# Antes de subir: copie .env.example para .env e defina a senha.
+
+services:
+  banco:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no arquivo .env}
+    # Ajuste para uma máquina de 8 GB
+    command: >
+      postgres
+      -c shared_buffers=2GB
+      -c effective_cache_size=6GB
+      -c work_mem=32MB
+      -c maintenance_work_mem=512MB
+    shm_size: 1g
+    volumes:
+      - banco:/var/lib/postgresql
+      # Na primeira subida, restaura o backup do banco já pronto
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+      - ./docker/enade2023.dump:/backup/enade2023.dump:ro
+    # Só aceita conexão da própria máquina: o DBeaver entra por túnel SSH
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  site:
+    build:
+      context: .
+      dockerfile: docker/site.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "80:80"
+
+  carga:
+    build: .
+    profiles: ["ferramentas"]
+    depends_on:
+      banco:
+        condition: service_healthy
+    environment:
+      PGHOST: banco
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    # O projeto inteiro é montado: dicionários, dados do site e análise
+    # gerados aqui aparecem na pasta do projeto. Microdados ficam em fontes/.
+    volumes:
+      - .:/app
+
+volumes:
+  banco:

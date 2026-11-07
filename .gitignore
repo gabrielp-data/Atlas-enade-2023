@@ -7,6 +7,7 @@ fontes/
 
 # Arquivos grandes ou temporários
 *.dump
+!docker/enade2023.dump
 *.geojson
 *.txt
 !requirements.txt
