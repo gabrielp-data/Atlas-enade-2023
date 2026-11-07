@@ -1,0 +1,64 @@
+name: Testar containers
+
+# Sobe o projeto com docker compose, do jeito que está no README,
+# e confere se o banco restaurou e se o site responde.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docker/**'
+      - 'docker-compose.yml'
+      - 'Dockerfile'
+      - '.github/workflows/docker.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  containers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Criar o .env
+        run: cp .env.example .env
+
+      - name: Subir os containers
+        run: docker compose up -d --build
+
+      - name: Esperar o banco restaurar
+        run: |
+          for i in $(seq 1 120); do
+            n=$(docker compose exec -T banco psql -U postgres -tAc \
+                "select count(*) from gabriel.inep_enade_2023_curso" 2>/dev/null || true)
+            if [ "$n" = "406294" ]; then echo "Banco pronto após ~$((i*5))s"; exit 0; fi
+            sleep 5
+          done
+          docker compose logs banco
+          exit 1
+
+      - name: Conferir o banco
+        run: |
+          q() { docker compose exec -T banco psql -U postgres -tAc "$1"; }
+          test "$(q 'select count(*) from gabriel.inep_enade_2023_cadastro_curso')" = "9812"
+          test "$(q 'select count(*) from gabriel.inep_enade_2023_indicadores_curso')" = "9812"
+          test "$(q "select count(*) from information_schema.tables where table_schema='gabriel' and table_type='BASE TABLE'")" = "13"
+          q "select count(*) from pg_description d join pg_class c on c.oid=d.objoid join pg_namespace n on n.oid=c.relnamespace where n.nspname='gabriel'"
+          echo "Banco conferido."
+
+      - name: Conferir o site
+        run: |
+          curl -fsS http://localhost/ | grep -q 'site/'
+          curl -fsS http://localhost/site/ | grep -q 'Atlas ENADE 2023'
+          js=$(curl -fsS http://localhost/site/ | grep -o 'dados/dados.js?v=[^"]*')
+          curl -fsS -H 'Accept-Encoding: gzip' -o /dev/null -w 'dados.js: %{http_code}, %{size_download} bytes (gzip)\n' "http://localhost/site/$js"
+          echo "Site conferido."
+
+      - name: Conferir os scripts Python
+        run: docker compose run --rm carga python -c "import pandas, psycopg2, openpyxl; print('scripts ok')"
+
+      - name: Logs em caso de erro
+        if: failure()
+        run: docker compose logs
